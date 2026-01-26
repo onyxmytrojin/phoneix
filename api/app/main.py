@@ -8,8 +8,9 @@ from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
 
 from app.config import ALLOWED_ORIGIN, RATE_LIMIT
+from app.db.database import init_db, close_db
 from app.middleware.logging import RequestLoggingMiddleware
-from app.routers import health
+from app.routers import health, server, github, profile
 
 limiter = Limiter(key_func=get_remote_address, default_limits=[f"{RATE_LIMIT}/minute"])
 
@@ -33,6 +34,19 @@ app.add_middleware(
 )
 
 app.include_router(health.router, prefix="/v1")
+app.include_router(server.router, prefix="/v1")
+app.include_router(github.router, prefix="/v1")
+app.include_router(profile.router, prefix="/v1")
+
+
+@app.on_event("startup")
+async def startup():
+    await init_db()
+
+
+@app.on_event("shutdown")
+async def shutdown():
+    await close_db()
 
 
 @app.exception_handler(Exception)
