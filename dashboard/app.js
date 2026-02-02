@@ -170,15 +170,57 @@ function initTabs() {
   if (tabs.length) tabs[0].click();
 }
 
+// ── Availability grid ─────────────────────────────────────────────────────────
+
+async function updateAvailability() {
+  const data = await apiFetch('/v1/availability');
+  const grid = document.getElementById('availability-grid');
+  const summary = document.getElementById('availability-summary');
+  if (!grid || !data) return;
+
+  grid.innerHTML = data.days.map(d => {
+    const title = `${d.date}: ${d.uptime_percent}% uptime`;
+    return `<div class="avail-day ${d.status}" title="${title}"></div>`;
+  }).join('');
+
+  if (summary) {
+    summary.textContent = `30-day average: ${data.summary.last_30_days}% uptime`;
+  }
+}
+
+// ── API Explorer ──────────────────────────────────────────────────────────────
+
+function initApiExplorer() {
+  document.querySelectorAll('.api-endpoint').forEach(el => {
+    const btn = el.querySelector('.api-try-btn');
+    const pre = el.querySelector('.api-response');
+    const path = el.dataset.path;
+
+    btn.addEventListener('click', async () => {
+      btn.textContent = '...';
+      btn.classList.add('loading');
+      pre.style.display = 'block';
+      pre.textContent = 'Loading...';
+
+      const data = await apiFetch(path);
+      pre.textContent = data ? JSON.stringify(data, null, 2) : 'Error fetching endpoint';
+      btn.textContent = 'Try';
+      btn.classList.remove('loading');
+    });
+  });
+}
+
 // ── Init ──────────────────────────────────────────────────────────────────────
 
 document.addEventListener('DOMContentLoaded', () => {
   initTabs();
+  initApiExplorer();
 
   updateStatusPill();
   updateServerStats();
   updateNow();
   updateGithub();
+  updateAvailability();
 
   setInterval(updateServerStats, 5000);
   setInterval(updateStatusPill, 30000);

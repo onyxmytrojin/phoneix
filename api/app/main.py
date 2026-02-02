@@ -10,7 +10,7 @@ from slowapi.util import get_remote_address
 from app.config import ALLOWED_ORIGIN, RATE_LIMIT
 from app.db.database import init_db, close_db
 from app.middleware.logging import RequestLoggingMiddleware
-from app.routers import health, server, github, profile
+from app.routers import health, server, github, profile, metrics, discovery
 
 limiter = Limiter(key_func=get_remote_address, default_limits=[f"{RATE_LIMIT}/minute"])
 
@@ -37,6 +37,8 @@ app.include_router(health.router, prefix="/v1")
 app.include_router(server.router, prefix="/v1")
 app.include_router(github.router, prefix="/v1")
 app.include_router(profile.router, prefix="/v1")
+app.include_router(metrics.router, prefix="/v1")
+app.include_router(discovery.router, prefix="/v1")
 
 
 @app.on_event("startup")

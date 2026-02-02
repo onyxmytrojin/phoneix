@@ -1,3 +1,4 @@
+import asyncio
 from datetime import datetime, timezone
 
 import httpx
@@ -8,6 +9,7 @@ from app.config import GITHUB_TOKEN
 router = APIRouter()
 
 HEADERS = {"Authorization": f"token {GITHUB_TOKEN}", "Accept": "application/vnd.github.v3+json"}
+USERNAME = "onyxmytrojin"
 
 
 def _time_ago(iso_str: str) -> str:
@@ -27,38 +29,45 @@ def _time_ago(iso_str: str) -> str:
 async def github(response: Response):
     response.headers["Cache-Control"] = "max-age=300"
 
-    async with httpx.AsyncClient(timeout=8, headers=HEADERS) as client:
-        user_res = await client.get("https://api.github.com/users/onyxmytrojin")
-        events_res = await client.get("https://api.github.com/users/onyxmytrojin/events?per_page=30")
+    async with httpx.AsyncClient(timeout=10, headers=HEADERS) as client:
+        user_res, repos_res = await asyncio.gather(
+            client.get(f"https://api.github.com/users/{USERNAME}"),
+            client.get(f"https://api.github.com/users/{USERNAME}/repos?sort=updated&per_page=5"),
+        )
 
     if user_res.status_code != 200:
         return {"error": "github_unavailable", "status": 503}
 
     user = user_res.json()
+    repos = repos_res.json() if repos_res.status_code == 200 else []
 
     commits = []
-    if events_res.status_code == 200:
-        for event in events_res.json():
-            if event.get("type") == "PushEvent":
-                repo = event["repo"]["name"].split("/")[-1]
-                for c in event["payload"].get("commits", [])[:2]:
+    async with httpx.AsyncClient(timeout=10, headers=HEADERS) as client:
+        for repo in repos[:5]:
+            if repo.get("fork"):
+                continue
+            c_res = await client.get(
+                f"https://api.github.com/repos/{USERNAME}/{repo['name']}/commits?per_page=2"
+            )
+            if c_res.status_code == 200:
+                for c in c_res.json():
                     commits.append({
-                        "repo": repo,
-                        "message": c["message"].split("\n")[0][:80],
-                        "date": event["created_at"],
-                        "time_ago": _time_ago(event["created_at"]),
-                        "url": f"https://github.com/{event['repo']['name']}/commit/{c['sha']}",
+                        "repo": repo["name"],
+                        "message": c["commit"]["message"].split("\n")[0][:80],
+                        "date": c["commit"]["author"]["date"],
+                        "time_ago": _time_ago(c["commit"]["author"]["date"]),
+                        "url": c["html_url"],
                     })
-                    if len(commits) >= 5:
-                        break
-            if len(commits) >= 5:
+            if len(commits) >= 6:
                 break
+
+    commits.sort(key=lambda x: x["date"], reverse=True)
 
     return {
         "username": user.get("login"),
         "public_repos": user.get("public_repos"),
         "followers": user.get("followers"),
-        "recent_commits": commits,
+        "recent_commits": commits[:6],
         "profile_url": user.get("html_url"),
     }
 
@@ -67,13 +76,14 @@ async def github(response: Response):
 async def projects(response: Response):
     response.headers["Cache-Control"] = "max-age=300"
 
-    async with httpx.AsyncClient(timeout=8, headers=HEADERS) as client:
-        res = await client.get("https://api.github.com/users/onyxmytrojin/repos?sort=updated&per_page=10")
+    async with httpx.AsyncClient(timeout=10, headers=HEADERS) as client:
+        res = await client.get(
+            f"https://api.github.com/users/{USERNAME}/repos?sort=updated&per_page=10"
+        )
 
     if res.status_code != 200:
         return {"projects": []}
 
-    repos = res.json()
     return {
         "projects": [
             {
@@ -83,8 +93,9 @@ async def projects(response: Response):
                 "stars": r["stargazers_count"],
                 "language": r.get("language") or "",
                 "last_commit": r["updated_at"],
+                "time_ago": _time_ago(r["updated_at"]),
             }
-            for r in repos
+            for r in res.json()
             if not r["fork"]
         ]
     }

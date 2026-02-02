@@ -399,6 +399,58 @@ body:not(.dark) .contact-name { color: #23272a; }
 body:not(.dark) .contact-link { background: #e8f2ff; }
 .contact-link:hover { background: #0070f3; color: #fff; }
 
+/* ── Availability grid ── */
+.availability-grid {
+  display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 0.8rem;
+}
+.avail-day {
+  width: 20px; height: 20px; border-radius: 4px;
+  background: #22c55e; cursor: default;
+  transition: transform 0.1s;
+  position: relative;
+}
+.avail-day:hover { transform: scale(1.3); z-index: 1; }
+.avail-day.degraded { background: #f59e0b; }
+.avail-day.incident { background: #ef4444; }
+.avail-day.no_data { background: #334155; }
+.availability-summary { font-size: 0.85rem; color: #64748b; }
+body.dark .availability-summary { color: #94a3b8; }
+
+/* ── API Explorer ── */
+.api-explorer { display: flex; flex-direction: column; gap: 0.6rem; }
+.api-endpoint {
+  border: 1px solid #e2e8f0; border-radius: 10px; overflow: hidden;
+}
+body.dark .api-endpoint { border-color: #2d3748; }
+.api-endpoint-header {
+  display: flex; align-items: center; gap: 0.8rem;
+  padding: 0.7rem 1rem; background: #f8fafc; cursor: pointer;
+}
+body.dark .api-endpoint-header { background: #1a1d22; }
+.api-method {
+  font-size: 0.75rem; font-weight: 700; color: #0070f3;
+  background: #e8f2ff; padding: 0.15em 0.6em; border-radius: 4px;
+}
+body.dark .api-method { background: #0a2240; }
+.api-path { font-family: monospace; font-size: 0.9rem; color: #23272a; flex: 1; }
+body.dark .api-path { color: #f3f3f3; }
+.api-try-btn {
+  background: #0070f3; color: #fff; border: none;
+  padding: 0.3em 0.9em; border-radius: 6px;
+  font-size: 0.82rem; font-weight: 600; cursor: pointer;
+  transition: background 0.2s;
+}
+.api-try-btn:hover { background: #005bb5; }
+.api-try-btn.loading { background: #64748b; cursor: wait; }
+.api-response {
+  margin: 0; padding: 0.8rem 1rem;
+  background: #0d1117; color: #58a6ff;
+  font-family: monospace; font-size: 0.8rem;
+  line-height: 1.6; overflow-x: auto;
+  border-top: 1px solid #2d3748;
+  max-height: 260px; overflow-y: auto;
+}
+
 /* ── Footer ── */
 footer {
   background: #fff; text-align: center;
