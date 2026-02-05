@@ -360,6 +360,12 @@
 <section class="section-card">
   <div class="section-title">30-Day Uptime</div>
   <div id="availability-grid" class="availability-grid"></div>
+  <div class="avail-legend">
+    <div class="avail-legend-item"><div class="avail-legend-dot" style="background:#22c55e"></div> Healthy</div>
+    <div class="avail-legend-item"><div class="avail-legend-dot" style="background:#f59e0b"></div> Degraded</div>
+    <div class="avail-legend-item"><div class="avail-legend-dot" style="background:#ef4444"></div> Incident</div>
+    <div class="avail-legend-item"><div class="avail-legend-dot" style="background:#4a5568"></div> No data</div>
+  </div>
   <div id="availability-summary" class="availability-summary"></div>
 </section>
 
@@ -372,33 +378,45 @@
       <div class="api-endpoint-header">
         <span class="api-method">GET</span>
         <span class="api-path">/v1/ping</span>
-        <button class="api-try-btn">Try</button>
+        <button class="api-try-btn">Try →</button>
       </div>
-      <pre class="api-response" style="display:none"></pre>
+      <div class="api-response-wrap" style="display:none">
+        <div class="api-response-label">Response</div>
+        <pre class="api-response"></pre>
+      </div>
     </div>
     <div class="api-endpoint" data-path="/v1/server">
       <div class="api-endpoint-header">
         <span class="api-method">GET</span>
         <span class="api-path">/v1/server</span>
-        <button class="api-try-btn">Try</button>
+        <button class="api-try-btn">Try →</button>
       </div>
-      <pre class="api-response" style="display:none"></pre>
+      <div class="api-response-wrap" style="display:none">
+        <div class="api-response-label">Response</div>
+        <pre class="api-response"></pre>
+      </div>
     </div>
     <div class="api-endpoint" data-path="/v1/health">
       <div class="api-endpoint-header">
         <span class="api-method">GET</span>
         <span class="api-path">/v1/health</span>
-        <button class="api-try-btn">Try</button>
+        <button class="api-try-btn">Try →</button>
       </div>
-      <pre class="api-response" style="display:none"></pre>
+      <div class="api-response-wrap" style="display:none">
+        <div class="api-response-label">Response</div>
+        <pre class="api-response"></pre>
+      </div>
     </div>
     <div class="api-endpoint" data-path="/v1/now">
       <div class="api-endpoint-header">
         <span class="api-method">GET</span>
         <span class="api-path">/v1/now</span>
-        <button class="api-try-btn">Try</button>
+        <button class="api-try-btn">Try →</button>
       </div>
-      <pre class="api-response" style="display:none"></pre>
+      <div class="api-response-wrap" style="display:none">
+        <div class="api-response-label">Response</div>
+        <pre class="api-response"></pre>
+      </div>
     </div>
   </div>
   <a href="https://api.shubhanmehrotra.com/docs" target="_blank" class="hero-link" style="display:inline-flex;margin-top:1.2rem">Full Swagger Docs →</a>

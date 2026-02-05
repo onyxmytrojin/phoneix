@@ -193,18 +193,27 @@ async function updateAvailability() {
 function initApiExplorer() {
   document.querySelectorAll('.api-endpoint').forEach(el => {
     const btn = el.querySelector('.api-try-btn');
+    const wrap = el.querySelector('.api-response-wrap');
     const pre = el.querySelector('.api-response');
     const path = el.dataset.path;
 
     btn.addEventListener('click', async () => {
-      btn.textContent = '...';
+      btn.textContent = 'Loading...';
       btn.classList.add('loading');
-      pre.style.display = 'block';
-      pre.textContent = 'Loading...';
+      btn.classList.remove('success');
+      wrap.style.display = 'block';
+      pre.textContent = '// Fetching from ' + API_BASE + path + ' …';
 
-      const data = await apiFetch(path);
-      pre.textContent = data ? JSON.stringify(data, null, 2) : 'Error fetching endpoint';
-      btn.textContent = 'Try';
+      const data = await apiFetch(path, 8000);
+      if (data) {
+        pre.textContent = JSON.stringify(data, null, 2);
+        btn.classList.add('success');
+        btn.textContent = '✓ Done';
+        wrap.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      } else {
+        pre.textContent = '// Error: request failed or timed out';
+        btn.textContent = 'Retry →';
+      }
       btn.classList.remove('loading');
     });
   });
