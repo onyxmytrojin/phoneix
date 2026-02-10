@@ -8,6 +8,7 @@ API_KEY = os.getenv("API_KEY", "")
 ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
 RATE_LIMIT = int(os.getenv("RATE_LIMIT", "100"))
+BIRTHDATE = os.getenv("BIRTHDATE", "2003-03-17")
 
 ALLOWED_ORIGIN = (
     "https://shubhanmehrotra.com"

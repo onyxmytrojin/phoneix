@@ -1,6 +1,16 @@
+from datetime import date
+
 from fastapi import APIRouter, Response
 
+from app.config import BIRTHDATE
+
 router = APIRouter()
+
+
+def _age() -> int:
+    dob = date.fromisoformat(BIRTHDATE)
+    today = date.today()
+    return today.year - dob.year - ((today.month, today.day) < (dob.month, dob.day))
 
 
 @router.get("/cv")
@@ -8,6 +18,7 @@ async def cv(response: Response):
     response.headers["Cache-Control"] = "max-age=3600"
     return {
         "name": "Shubhan Mehrotra",
+        "age": _age(),
         "title": "Software Engineer | Backend Engineer",
         "location": "Bangalore, India",
         "email": "shubhanmehrotra@gmail.com",

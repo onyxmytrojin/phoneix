@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Shubhan Mehrotra</title>
-  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="style.css?v=4" />
 </head>
 <body>
 
@@ -25,9 +25,17 @@
 
 <!-- ── Hero ── -->
 <section id="home" class="hero">
-  <div class="hero-initials">SM</div>
-  <h1>Shubhan Mehrotra</h1>
-  <p class="subtitle">Software Engineer · Backend · Distributed Systems</p>
+  <div class="hero-greeting">Hi 👋 Shubhan here</div>
+  <p class="hero-bio">
+    I am a <strong id="hero-age">23</strong> yo Software Engineer from India.<br>
+    I love solving problems and building things that run on real hardware.
+  </p>
+  <div class="hero-pfp-wrap">
+    <img id="hero-pfp" class="hero-pfp" src="" alt="" style="display:none" />
+    <div class="hero-initials" id="hero-initials">SM</div>
+  </div>
+  <h1 class="hero-name">Shubhan Mehrotra</h1>
+  <p class="hero-role">Software Engineer · <span class="hero-company">Entrupy</span></p>
   <div class="hero-links">
     <a href="https://github.com/onyxmytrojin" target="_blank" class="hero-link">GitHub</a>
     <a href="https://linkedin.com/in/shubhanmehrotra" target="_blank" class="hero-link">LinkedIn</a>
@@ -43,7 +51,7 @@
       <div class="server-stats-title">Live Server</div>
       <div class="server-hardware">Google Pixel 7a · ARM64 · Debian Linux · GrapheneOS</div>
     </div>
-    <span id="status-pill-server" class="live-pill"><span class="live-dot"></span> Live</span>
+    <span class="live-pill"><span class="live-dot"></span> Live</span>
   </div>
   <div id="server-stats-content">
     <div class="stats-grid">
@@ -77,15 +85,29 @@
   <div class="section-title">Currently Building</div>
   <div id="now-content">
     <div class="now-card">
-      <div>
-        <div class="now-label">Currently building</div>
-        <div class="now-project">Phoneix</div>
-        <div class="now-desc">Personal API, live dashboard, and self-healing distributed cache — all running on a Pixel 7a</div>
-        <div class="now-tags">
-          <span>FastAPI</span><span>Go</span><span>Distributed Systems</span><span>Self-Hosted</span>
-        </div>
+      <div class="now-label">Currently building</div>
+      <div class="now-project">Phoneix</div>
+      <div class="now-desc">Personal API, live dashboard, and self-healing distributed cache — all running on a Pixel 7a</div>
+      <div class="now-tags">
+        <span>FastAPI</span><span>Go</span><span>Distributed Systems</span><span>Self-Hosted</span>
       </div>
     </div>
+  </div>
+</section>
+
+<!-- ── GitHub Activity ── -->
+<section id="github-activity" class="section-card">
+  <div class="section-title-row">
+    <div class="section-title">GitHub Activity</div>
+    <div class="github-meta" id="github-meta"></div>
+  </div>
+  <div id="github-commits" class="commits-grid">
+    <div class="skeleton" style="height:72px"></div>
+    <div class="skeleton" style="height:72px"></div>
+    <div class="skeleton" style="height:72px"></div>
+    <div class="skeleton" style="height:72px"></div>
+    <div class="skeleton" style="height:72px"></div>
+    <div class="skeleton" style="height:72px"></div>
   </div>
 </section>
 
@@ -96,9 +118,7 @@
     <button class="tab" data-panel="edu-panel">Education</button>
   </div>
 
-  <!-- Work -->
   <div class="timeline-panel" id="work-panel">
-
     <div class="timeline-card">
       <div class="timeline-logo entrupy">E</div>
       <div class="timeline-content">
@@ -145,12 +165,9 @@
         </ul>
       </div>
     </div>
-
   </div>
 
-  <!-- Education -->
   <div class="timeline-panel" id="edu-panel" style="display:none">
-
     <div class="timeline-card">
       <div class="timeline-logo iit">IIT</div>
       <div class="timeline-content">
@@ -163,136 +180,91 @@
         </ul>
       </div>
     </div>
-
     <div class="timeline-card">
-      <div class="timeline-logo cbse" style="font-size:0.7rem;font-weight:700">CBSE</div>
+      <div class="timeline-logo cbse">CBSE</div>
       <div class="timeline-content">
         <span class="timeline-date">2021</span>
         <div class="timeline-org">Satyameva Jayate International School <span class="edu-grade">90.8%</span></div>
         <div class="timeline-role">Senior Secondary</div>
       </div>
     </div>
-
     <div class="timeline-card">
-      <div class="timeline-logo cbse" style="font-size:0.7rem;font-weight:700">CBSE</div>
+      <div class="timeline-logo cbse">CBSE</div>
       <div class="timeline-content">
         <span class="timeline-date">2019</span>
         <div class="timeline-org">Aditya Birla Public School Kovaya <span class="edu-grade">93.8%</span></div>
         <div class="timeline-role">Secondary</div>
       </div>
     </div>
-
   </div>
 </section>
 
 <!-- ── Projects ── -->
 <section id="projects" class="projects-section">
-  <div class="projects-header">
-    <h2 class="projects-title">Projects</h2>
-  </div>
+  <h2 class="projects-title">Projects</h2>
   <div class="projects-grid">
-
     <div class="project-card">
       <div class="project-card-header">
-        <h3>Phoneix</h3>
-        <span class="project-live-badge">🟢 Live</span>
+        <h3>Phoneix</h3><span class="project-live-badge">🟢 Live</span>
       </div>
       <p class="project-desc">Personal API + live dashboard + self-healing distributed cache running on a Pixel 7a. FastAPI backend with versioned endpoints, Go cache with consistent hashing and gossip-based failure detection.</p>
-      <div class="project-tags">
-        <span>FastAPI</span><span>Go</span><span>Nginx</span><span>Distributed Systems</span><span>Python</span>
-      </div>
+      <div class="project-tags"><span>FastAPI</span><span>Go</span><span>Nginx</span><span>Distributed Systems</span></div>
       <div class="project-links">
         <a href="https://shubhanmehrotra.com" target="_blank" class="project-btn">Live</a>
         <a href="https://github.com/onyxmytrojin/phoneix" target="_blank" class="project-btn">GitHub</a>
       </div>
     </div>
-
     <div class="project-card">
       <div class="project-card-header">
-        <h3>Pixel Server</h3>
-        <span class="project-live-badge">🟢 Running</span>
+        <h3>Pixel Server</h3><span class="project-live-badge">🟢 Running</span>
       </div>
       <p class="project-desc">Turned a Google Pixel 7a into a 24/7 Linux server. GrapheneOS + Magisk root + Debian via proot-distro + Dropbear SSH + Cloudflare Tunnel. Serves real traffic at shubhanmehrotra.com.</p>
-      <div class="project-tags">
-        <span>Linux</span><span>GrapheneOS</span><span>Cloudflare</span><span>Nginx</span><span>ARM64</span>
-      </div>
+      <div class="project-tags"><span>Linux</span><span>GrapheneOS</span><span>Cloudflare</span><span>Nginx</span><span>ARM64</span></div>
       <div class="project-links">
         <a href="https://github.com/onyxmytrojin/pixel-server" target="_blank" class="project-btn">GitHub</a>
       </div>
     </div>
-
     <div class="project-card">
-      <div class="project-card-header">
-        <h3>Weather App for Scientists</h3>
-      </div>
+      <div class="project-card-header"><h3>Weather App for Scientists</h3></div>
       <p class="project-desc">Full-stack weather monitoring system processing 1,000+ hourly sensor data points with 99.9% ingestion uptime. Django backend + React Native frontend, integrating 8+ RESTful APIs from 20+ ground sensors.</p>
-      <div class="project-tags">
-        <span>Django</span><span>React Native</span><span>PostgreSQL</span><span>Redis</span><span>Docker</span>
-      </div>
+      <div class="project-tags"><span>Django</span><span>React Native</span><span>PostgreSQL</span><span>Redis</span><span>Docker</span></div>
       <div class="project-links">
         <a href="https://drive.google.com/file/d/1NLcrEvskVmy2S9t98Ol7u-RFgtgKOikh/view" target="_blank" class="project-btn">Paper</a>
       </div>
     </div>
-
     <div class="project-card">
-      <div class="project-card-header">
-        <h3>Kochi Metro Ridership Analysis</h3>
-      </div>
+      <div class="project-card-header"><h3>Kochi Metro Ridership Analysis</h3></div>
       <p class="project-desc">Standardised 30M+ ticketing data points using SQL and Python, uncovering commute patterns that drove a 15% increase in targeted ridership. 5-year dataset analysis for Kerala's metro system.</p>
-      <div class="project-tags">
-        <span>PostgreSQL</span><span>Python</span><span>Pandas</span><span>Matplotlib</span><span>SQL</span>
-      </div>
+      <div class="project-tags"><span>PostgreSQL</span><span>Python</span><span>Pandas</span><span>Matplotlib</span></div>
       <div class="project-links">
         <a href="https://github.com/onyxmytrojin/Deciphering-Ridership-and-Travel-Demand-Patterns-from-Kochi-Metro-s-5-Year-Ticketing-Data" target="_blank" class="project-btn">GitHub</a>
         <a href="https://drive.google.com/file/d/1bYV1H65vGxWUa4fGQw32pk0yPxqrHDdT/view" target="_blank" class="project-btn">Paper</a>
       </div>
     </div>
-
     <div class="project-card">
-      <div class="project-card-header">
-        <h3>Baby Cry Detection — 2D CNN + LSTM</h3>
-      </div>
+      <div class="project-card-header"><h3>Baby Cry Detection — 2D CNN + LSTM</h3></div>
       <p class="project-desc">Trained 2D CNN and LSTM models to classify baby cries into 5 health categories achieving 94.57% and 91.47% accuracy. Spectrogram features via STFT for audio signal classification.</p>
-      <div class="project-tags">
-        <span>TensorFlow</span><span>Keras</span><span>LSTM</span><span>CNN</span><span>Python</span>
-      </div>
+      <div class="project-tags"><span>TensorFlow</span><span>Keras</span><span>LSTM</span><span>CNN</span><span>Python</span></div>
       <div class="project-links">
         <a href="https://github.com/onyxmytrojin/Baby-Cry-Sound-Detection-for-Baby-Health-and-Wellness-Monitoring-using-2D-CNN-and-LSTM" target="_blank" class="project-btn">GitHub</a>
         <a href="https://drive.google.com/file/d/1h4csKBU6eA3ME5___OCAY8d-s3rKKthq/view" target="_blank" class="project-btn">Paper</a>
       </div>
     </div>
-
     <div class="project-card">
-      <div class="project-card-header">
-        <h3>Pathway — Inter IIT Tech Meet 13.0</h3>
-      </div>
+      <div class="project-card-header"><h3>Pathway — Inter IIT Tech Meet 13.0</h3></div>
       <p class="project-desc">Modular Agentic RAG pipeline with dynamic query classification and multi-tier retrievers. Benchmarked colBERT and BGE-m3 on MS MARCO achieving 43% NDCG@10. Top 10 finish at national competition.</p>
-      <div class="project-tags">
-        <span>RAG</span><span>colBERT</span><span>BGE-m3</span><span>LLM</span><span>Python</span>
-      </div>
+      <div class="project-tags"><span>RAG</span><span>colBERT</span><span>BGE-m3</span><span>LLM</span><span>Python</span></div>
       <div class="project-links">
         <a href="https://github.com/PranavRao25/Tech-Meet-24" target="_blank" class="project-btn">GitHub</a>
         <a href="https://drive.google.com/file/d/1CTCWWMpg2-O2tRucITu89MXZhkkB1Q6V/view" target="_blank" class="project-btn">Paper</a>
       </div>
     </div>
-
-  </div>
-</section>
-
-<!-- ── GitHub Activity ── -->
-<section class="section-card github-section">
-  <div class="section-title">GitHub Activity</div>
-  <div id="github-commits">
-    <div class="skeleton" style="height:60px;margin-bottom:0.8rem"></div>
-    <div class="skeleton" style="height:60px;margin-bottom:0.8rem"></div>
-    <div class="skeleton" style="height:60px"></div>
   </div>
 </section>
 
 <!-- ── Skills ── -->
 <section id="skills" class="skills-section">
   <div class="skills-title">Skills</div>
-
   <div class="skills-group">
     <div class="skills-group-label">Languages</div>
     <div class="skills-tags">
@@ -304,7 +276,6 @@
       <span class="skill-tag">C / C++</span>
     </div>
   </div>
-
   <div class="skills-group">
     <div class="skills-group-label">Backend</div>
     <div class="skills-tags">
@@ -316,7 +287,6 @@
       <span class="skill-tag">Billing Systems</span>
     </div>
   </div>
-
   <div class="skills-group">
     <div class="skills-group-label">Cloud & DevOps</div>
     <div class="skills-tags">
@@ -330,7 +300,6 @@
       <span class="skill-tag">Cloudflare</span>
     </div>
   </div>
-
   <div class="skills-group">
     <div class="skills-group-label">Databases</div>
     <div class="skills-tags">
@@ -341,7 +310,6 @@
       <span class="skill-tag">Redis</span>
     </div>
   </div>
-
   <div class="skills-group">
     <div class="skills-group-label">Distributed Systems</div>
     <div class="skills-tags">
@@ -353,7 +321,6 @@
       <span class="skill-tag">Health Checks</span>
     </div>
   </div>
-
 </section>
 
 <!-- ── Availability ── -->
@@ -361,10 +328,10 @@
   <div class="section-title">30-Day Uptime</div>
   <div id="availability-grid" class="availability-grid"></div>
   <div class="avail-legend">
-    <div class="avail-legend-item"><div class="avail-legend-dot" style="background:#22c55e"></div> Healthy</div>
-    <div class="avail-legend-item"><div class="avail-legend-dot" style="background:#f59e0b"></div> Degraded</div>
-    <div class="avail-legend-item"><div class="avail-legend-dot" style="background:#ef4444"></div> Incident</div>
-    <div class="avail-legend-item"><div class="avail-legend-dot" style="background:#4a5568"></div> No data</div>
+    <div class="avail-legend-item"><span class="avail-legend-dot" style="background:#22c55e"></span>Healthy</div>
+    <div class="avail-legend-item"><span class="avail-legend-dot" style="background:#f59e0b"></span>Degraded</div>
+    <div class="avail-legend-item"><span class="avail-legend-dot" style="background:#ef4444"></span>Incident</div>
+    <div class="avail-legend-item"><span class="avail-legend-dot" style="background:#4a5568"></span>No data yet</div>
   </div>
   <div id="availability-summary" class="availability-summary"></div>
 </section>
@@ -372,54 +339,37 @@
 <!-- ── API Explorer ── -->
 <section class="section-card">
   <div class="section-title">API Explorer</div>
-  <p style="font-size:0.88rem;color:#888;margin:0 0 1.2rem">Live responses from the API. Click any endpoint to try it.</p>
+  <p class="api-subtitle">Live responses from the Phoneix API running on the Pixel 7a. Click Try to fire a real request.</p>
   <div class="api-explorer">
-    <div class="api-endpoint" data-path="/v1/ping">
-      <div class="api-endpoint-header">
-        <span class="api-method">GET</span>
-        <span class="api-path">/v1/ping</span>
-        <button class="api-try-btn">Try →</button>
-      </div>
-      <div class="api-response-wrap" style="display:none">
-        <div class="api-response-label">Response</div>
-        <pre class="api-response"></pre>
-      </div>
+    <div class="api-row" data-path="/v1/ping">
+      <span class="api-badge">GET</span>
+      <code class="api-path">/v1/ping</code>
+      <button class="api-btn" type="button">Try</button>
     </div>
-    <div class="api-endpoint" data-path="/v1/server">
-      <div class="api-endpoint-header">
-        <span class="api-method">GET</span>
-        <span class="api-path">/v1/server</span>
-        <button class="api-try-btn">Try →</button>
-      </div>
-      <div class="api-response-wrap" style="display:none">
-        <div class="api-response-label">Response</div>
-        <pre class="api-response"></pre>
-      </div>
+    <div class="api-output" id="out-ping" style="display:none"></div>
+
+    <div class="api-row" data-path="/v1/server">
+      <span class="api-badge">GET</span>
+      <code class="api-path">/v1/server</code>
+      <button class="api-btn" type="button">Try</button>
     </div>
-    <div class="api-endpoint" data-path="/v1/health">
-      <div class="api-endpoint-header">
-        <span class="api-method">GET</span>
-        <span class="api-path">/v1/health</span>
-        <button class="api-try-btn">Try →</button>
-      </div>
-      <div class="api-response-wrap" style="display:none">
-        <div class="api-response-label">Response</div>
-        <pre class="api-response"></pre>
-      </div>
+    <div class="api-output" id="out-server" style="display:none"></div>
+
+    <div class="api-row" data-path="/v1/health">
+      <span class="api-badge">GET</span>
+      <code class="api-path">/v1/health</code>
+      <button class="api-btn" type="button">Try</button>
     </div>
-    <div class="api-endpoint" data-path="/v1/now">
-      <div class="api-endpoint-header">
-        <span class="api-method">GET</span>
-        <span class="api-path">/v1/now</span>
-        <button class="api-try-btn">Try →</button>
-      </div>
-      <div class="api-response-wrap" style="display:none">
-        <div class="api-response-label">Response</div>
-        <pre class="api-response"></pre>
-      </div>
+    <div class="api-output" id="out-health" style="display:none"></div>
+
+    <div class="api-row" data-path="/v1/now">
+      <span class="api-badge">GET</span>
+      <code class="api-path">/v1/now</code>
+      <button class="api-btn" type="button">Try</button>
     </div>
+    <div class="api-output" id="out-now" style="display:none"></div>
   </div>
-  <a href="https://api.shubhanmehrotra.com/docs" target="_blank" class="hero-link" style="display:inline-flex;margin-top:1.2rem">Full Swagger Docs →</a>
+  <a href="https://api.shubhanmehrotra.com/docs" target="_blank" class="hero-link" style="display:inline-flex;margin-top:1.5rem">Full Swagger Docs →</a>
 </section>
 
 <!-- ── Contact ── -->
@@ -446,6 +396,6 @@
   </div>
 </footer>
 
-<script src="app.js"></script>
+<script src="app.js?v=4"></script>
 </body>
 </html>

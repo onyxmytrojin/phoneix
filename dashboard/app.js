@@ -4,7 +4,7 @@ const API_BASE = window.location.hostname === 'localhost' || window.location.hos
 
 let lastResponseMs = null;
 
-// ── Theme ────────────────────────────────────────────────────────────────────
+// ── Theme ─────────────────────────────────────────────────────────────────────
 
 (function initTheme() {
   const toggle = document.getElementById('theme-toggle');
@@ -24,9 +24,9 @@ let lastResponseMs = null;
   });
 })();
 
-// ── Fetch helper ─────────────────────────────────────────────────────────────
+// ── Fetch helper ──────────────────────────────────────────────────────────────
 
-async function apiFetch(path, timeoutMs = 5000) {
+async function apiFetch(path, timeoutMs = 6000) {
   const controller = new AbortController();
   const id = setTimeout(() => controller.abort(), timeoutMs);
   const start = performance.now();
@@ -50,6 +50,29 @@ function timeAgo(isoStr) {
   return `${Math.round(diff / 86400)}d ago`;
 }
 
+// ── Hero ──────────────────────────────────────────────────────────────────────
+
+async function updateHero() {
+  const data = await apiFetch('/v1/cv');
+  if (!data) return;
+
+  const ageEl = document.getElementById('hero-age');
+  if (ageEl && data.age) ageEl.textContent = data.age;
+
+  const ghData = await apiFetch('/v1/github');
+  if (!ghData) return;
+
+  const pfp = document.getElementById('hero-pfp');
+  const initials = document.getElementById('hero-initials');
+  if (pfp && ghData.avatar_url) {
+    pfp.src = ghData.avatar_url;
+    pfp.onload = () => {
+      pfp.style.display = 'block';
+      if (initials) initials.style.display = 'none';
+    };
+  }
+}
+
 // ── Status pill ───────────────────────────────────────────────────────────────
 
 async function updateStatusPill() {
@@ -65,7 +88,7 @@ async function updateStatusPill() {
   }
 }
 
-// ── Server stats ─────────────────────────────────────────────────────────────
+// ── Server stats ──────────────────────────────────────────────────────────────
 
 function setBar(id, percent) {
   const el = document.getElementById(id);
@@ -109,13 +132,11 @@ async function updateNow() {
 
   el.innerHTML = `
     <div class="now-card">
-      <div>
-        <div class="now-label">Currently building</div>
-        <div class="now-project">${data.project}</div>
-        <div class="now-desc">${data.description}</div>
-        <div class="now-tags">
-          ${(data.tags || []).map(t => `<span>${t}</span>`).join('')}
-        </div>
+      <div class="now-label">Currently building</div>
+      <div class="now-project">${data.project}</div>
+      <div class="now-desc">${data.description}</div>
+      <div class="now-tags">
+        ${(data.tags || []).map(t => `<span>${t}</span>`).join('')}
       </div>
     </div>
   `;
@@ -126,20 +147,21 @@ async function updateNow() {
 async function updateGithub() {
   const data = await apiFetch('/v1/github');
   const el = document.getElementById('github-commits');
+  const meta = document.getElementById('github-meta');
   if (!el) return;
 
   if (!data) {
-    el.innerHTML = '<p style="color:#888;font-size:0.9rem">GitHub data unavailable</p>';
+    el.innerHTML = '<p style="color:#888;font-size:0.9rem;grid-column:1/-1">GitHub data unavailable</p>';
     return;
   }
 
+  if (meta) meta.textContent = `${data.public_repos} repos · ${data.followers} followers`;
+
   el.innerHTML = (data.recent_commits || []).map(c => `
     <div class="commit-item">
-      <div style="flex:1">
-        <div class="commit-repo">${c.repo}</div>
-        <div class="commit-msg">${c.message}</div>
-        <div class="commit-time">${timeAgo(c.date)}</div>
-      </div>
+      <div class="commit-repo">${c.repo}</div>
+      <div class="commit-msg">${c.message}</div>
+      <div class="commit-time">${timeAgo(c.date)}</div>
     </div>
   `).join('');
 }
@@ -176,11 +198,16 @@ async function updateAvailability() {
   const data = await apiFetch('/v1/availability');
   const grid = document.getElementById('availability-grid');
   const summary = document.getElementById('availability-summary');
-  if (!grid || !data) return;
+  if (!grid) return;
+
+  if (!data || !data.days) {
+    grid.innerHTML = '<span style="font-size:0.85rem;color:#888">Unavailable</span>';
+    return;
+  }
 
   grid.innerHTML = data.days.map(d => {
-    const title = `${d.date}: ${d.uptime_percent}% uptime`;
-    return `<div class="avail-day ${d.status}" title="${title}"></div>`;
+    const tip = `${d.date}: ${d.uptime_percent}% uptime`;
+    return `<div class="avail-day ${d.status}" title="${tip}"></div>`;
   }).join('');
 
   if (summary) {
@@ -191,30 +218,36 @@ async function updateAvailability() {
 // ── API Explorer ──────────────────────────────────────────────────────────────
 
 function initApiExplorer() {
-  document.querySelectorAll('.api-endpoint').forEach(el => {
-    const btn = el.querySelector('.api-try-btn');
-    const wrap = el.querySelector('.api-response-wrap');
-    const pre = el.querySelector('.api-response');
-    const path = el.dataset.path;
+  document.querySelectorAll('.api-row').forEach((row, idx) => {
+    const btn = row.querySelector('.api-btn');
+    const path = row.dataset.path;
+    const outputId = 'out-' + path.split('/').pop();
+    const output = document.getElementById(outputId);
 
-    btn.addEventListener('click', async () => {
-      btn.textContent = 'Loading...';
-      btn.classList.add('loading');
-      btn.classList.remove('success');
-      wrap.style.display = 'block';
-      pre.textContent = '// Fetching from ' + API_BASE + path + ' …';
+    if (!btn || !output) return;
+
+    btn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      btn.textContent = '...';
+      btn.disabled = true;
+      output.style.display = 'block';
+      output.textContent = '// fetching from ' + API_BASE + path + ' …';
 
       const data = await apiFetch(path, 8000);
       if (data) {
-        pre.textContent = JSON.stringify(data, null, 2);
-        btn.classList.add('success');
-        btn.textContent = '✓ Done';
-        wrap.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        output.textContent = JSON.stringify(data, null, 2);
+        btn.textContent = '✓';
+        btn.style.background = '#16a34a';
+        setTimeout(() => {
+          btn.textContent = 'Try';
+          btn.style.background = '';
+          btn.disabled = false;
+        }, 2500);
       } else {
-        pre.textContent = '// Error: request failed or timed out';
-        btn.textContent = 'Retry →';
+        output.textContent = '// request failed or timed out';
+        btn.textContent = 'Retry';
+        btn.disabled = false;
       }
-      btn.classList.remove('loading');
     });
   });
 }
@@ -225,6 +258,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initTabs();
   initApiExplorer();
 
+  updateHero();
   updateStatusPill();
   updateServerStats();
   updateNow();

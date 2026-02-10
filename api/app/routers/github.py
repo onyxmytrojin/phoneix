@@ -67,6 +67,7 @@ async def github(response: Response):
         "username": user.get("login"),
         "public_repos": user.get("public_repos"),
         "followers": user.get("followers"),
+        "avatar_url": user.get("avatar_url"),
         "recent_commits": commits[:6],
         "profile_url": user.get("html_url"),
     }
