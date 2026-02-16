@@ -1,5 +1,5 @@
-import time
 import shutil
+import subprocess
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Response
@@ -8,26 +8,20 @@ router = APIRouter()
 
 
 def _read_cpu_percent() -> float:
-    def read_stat():
-        try:
-            with open("/proc/stat") as f:
-                line = f.readline()
-            vals = list(map(int, line.split()[1:]))
-            idle = vals[3]
-            total = sum(vals)
-            return idle, total
-        except Exception:
-            return 0, 1
-
-    idle1, total1 = read_stat()
-    time.sleep(0.1)
-    idle2, total2 = read_stat()
-
-    delta_total = total2 - total1
-    delta_idle = idle2 - idle1
-    if delta_total == 0:
-        return 0.0
-    return round((1 - delta_idle / delta_total) * 100, 1)
+    # /proc/stat counters are frozen in proot-distro; use top instead
+    try:
+        result = subprocess.run(
+            ["top", "-bn1"], capture_output=True, text=True, timeout=5
+        )
+        for line in result.stdout.splitlines():
+            if "Cpu" in line:
+                for part in line.split(","):
+                    if "id" in part:
+                        idle = float(part.strip().split()[0])
+                        return round(100.0 - idle, 1)
+    except Exception:
+        pass
+    return 0.0
 
 
 def _read_memory():
