@@ -1,27 +1,45 @@
 import shutil
-import subprocess
+import time
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Response
 
 router = APIRouter()
 
+# /proc/uptime is frozen in proot; capture it at startup and add real elapsed time
+_UPTIME_AT_START: float = 0.0
+_CLOCK_AT_START: float = time.time()
+try:
+    with open("/proc/uptime") as _f:
+        _UPTIME_AT_START = float(_f.read().split()[0])
+except Exception:
+    pass
+
 
 def _read_cpu_percent() -> float:
-    # /proc/stat counters are frozen in proot-distro; use top instead
+    # /proc/stat is frozen in proot-distro; derive CPU load from loadavg + freq
     try:
-        result = subprocess.run(
-            ["top", "-bn1"], capture_output=True, text=True, timeout=5
-        )
-        for line in result.stdout.splitlines():
-            if "Cpu" in line:
-                for part in line.split(","):
-                    if "id" in part:
-                        idle = float(part.strip().split()[0])
-                        return round(100.0 - idle, 1)
+        with open("/proc/loadavg") as f:
+            load_1min = float(f.read().split()[0])
+
+        # frequency-based boost: average efficiency cores (cpu0-3) cur/max
+        freq_sum, freq_n = 0.0, 0
+        for cpu_id in range(4):
+            try:
+                cur = int(open(f"/sys/devices/system/cpu/cpu{cpu_id}/cpufreq/scaling_cur_freq").read())
+                max_f = int(open(f"/sys/devices/system/cpu/cpu{cpu_id}/cpufreq/cpuinfo_max_freq").read())
+                if max_f > 0:
+                    freq_sum += cur / max_f
+                    freq_n += 1
+            except Exception:
+                continue
+
+        ncpu = 6  # cores visible in proot on Pixel 7a
+        load_pct = min(100.0, (load_1min / ncpu) * 100)
+        freq_pct = (freq_sum / freq_n * 100) if freq_n else load_pct
+        return round(0.5 * load_pct + 0.5 * freq_pct, 1)
     except Exception:
-        pass
-    return 0.0
+        return 0.0
 
 
 def _read_memory():
@@ -53,8 +71,7 @@ def _read_memory():
 
 def _read_uptime():
     try:
-        with open("/proc/uptime") as f:
-            secs = float(f.read().split()[0])
+        secs = _UPTIME_AT_START + (time.time() - _CLOCK_AT_START)
         days, rem = divmod(int(secs), 86400)
         hours, rem = divmod(rem, 3600)
         mins = rem // 60
