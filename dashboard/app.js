@@ -73,6 +73,30 @@ async function updateHero() {
   }
 }
 
+// ── Server strip ──────────────────────────────────────────────────────────────
+
+async function updateServerStrip() {
+  const pill = document.getElementById('strip-pill');
+  const stats = document.getElementById('strip-stats');
+
+  const data = await apiFetch('/v1/server');
+  if (data) {
+    if (pill) {
+      pill.className = 'live-pill strip-pill';
+      pill.innerHTML = '<span class="live-dot"></span> Live';
+    }
+    if (stats) {
+      stats.textContent = `CPU ${data.cpu_percent?.toFixed(1)}% · Uptime ${data.uptime_human}`;
+    }
+  } else {
+    if (pill) {
+      pill.className = 'live-pill strip-pill offline';
+      pill.innerHTML = '<span class="live-dot"></span> Offline';
+    }
+    if (stats) stats.textContent = '';
+  }
+}
+
 // ── Status pill ───────────────────────────────────────────────────────────────
 
 async function updateStatusPill() {
@@ -86,39 +110,6 @@ async function updateStatusPill() {
     pill.className = 'live-pill offline';
     pill.innerHTML = `<span class="live-dot"></span> Offline`;
   }
-}
-
-// ── Server stats ──────────────────────────────────────────────────────────────
-
-function setBar(id, percent) {
-  const el = document.getElementById(id);
-  if (!el) return;
-  el.style.width = `${Math.min(100, percent)}%`;
-  el.className = 'stat-bar-fill';
-  if (percent > 85) el.classList.add('danger');
-  else if (percent > 65) el.classList.add('warn');
-}
-
-async function updateServerStats() {
-  const data = await apiFetch('/v1/server');
-  const container = document.getElementById('server-stats-content');
-  if (!container) return;
-
-  if (!data) {
-    container.innerHTML = '<p class="server-unavailable">Server stats unavailable</p>';
-    return;
-  }
-
-  document.getElementById('stat-cpu-val').textContent = `${data.cpu_percent.toFixed(1)}%`;
-  document.getElementById('stat-ram-val').textContent = `${data.memory.used_gb.toFixed(1)} GB`;
-  document.getElementById('stat-ram-sub').textContent = `of ${data.memory.total_gb.toFixed(1)} GB`;
-  document.getElementById('stat-uptime-val').textContent = data.uptime_human;
-  document.getElementById('stat-disk-val').textContent = `${data.disk.free_gb.toFixed(0)} GB`;
-  document.getElementById('stat-disk-sub').textContent = 'free';
-
-  setBar('cpu-bar', data.cpu_percent);
-  setBar('ram-bar', data.memory.percent_used);
-  setBar('disk-bar', ((data.disk.total_gb - data.disk.free_gb) / data.disk.total_gb) * 100);
 }
 
 // ── Currently working on ──────────────────────────────────────────────────────
@@ -192,80 +183,18 @@ function initTabs() {
   if (tabs.length) tabs[0].click();
 }
 
-// ── Availability grid ─────────────────────────────────────────────────────────
-
-async function updateAvailability() {
-  const data = await apiFetch('/v1/availability');
-  const grid = document.getElementById('availability-grid');
-  const summary = document.getElementById('availability-summary');
-  if (!grid) return;
-
-  if (!data || !data.days) {
-    grid.innerHTML = '<span style="font-size:0.85rem;color:#888">Unavailable</span>';
-    return;
-  }
-
-  grid.innerHTML = data.days.map(d => {
-    const tip = `${d.date}: ${d.uptime_percent}% uptime`;
-    return `<div class="avail-day ${d.status}" title="${tip}"></div>`;
-  }).join('');
-
-  if (summary) {
-    summary.textContent = `30-day average: ${data.summary.last_30_days}% uptime`;
-  }
-}
-
-// ── API Explorer ──────────────────────────────────────────────────────────────
-
-function initApiExplorer() {
-  document.querySelectorAll('.api-row').forEach((row, idx) => {
-    const btn = row.querySelector('.api-btn');
-    const path = row.dataset.path;
-    const outputId = 'out-' + path.split('/').pop();
-    const output = document.getElementById(outputId);
-
-    if (!btn || !output) return;
-
-    btn.addEventListener('click', async (e) => {
-      e.stopPropagation();
-      btn.textContent = '...';
-      btn.disabled = true;
-      output.style.display = 'block';
-      output.textContent = '// fetching from ' + API_BASE + path + ' …';
-
-      const data = await apiFetch(path, 8000);
-      if (data) {
-        output.textContent = JSON.stringify(data, null, 2);
-        btn.textContent = '✓';
-        btn.style.background = '#16a34a';
-        setTimeout(() => {
-          btn.textContent = 'Try';
-          btn.style.background = '';
-          btn.disabled = false;
-        }, 2500);
-      } else {
-        output.textContent = '// request failed or timed out';
-        btn.textContent = 'Retry';
-        btn.disabled = false;
-      }
-    });
-  });
-}
-
 // ── Init ──────────────────────────────────────────────────────────────────────
 
 document.addEventListener('DOMContentLoaded', () => {
   initTabs();
-  initApiExplorer();
 
   updateHero();
   updateStatusPill();
-  updateServerStats();
+  updateServerStrip();
   updateNow();
   updateGithub();
-  updateAvailability();
 
-  setInterval(updateServerStats, 5000);
-  setInterval(updateStatusPill, 30000);
-  setInterval(updateGithub, 300000);
+  setInterval(updateServerStrip, 10000);
+  setInterval(updateStatusPill,  30000);
+  setInterval(updateGithub,     300000);
 });

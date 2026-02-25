@@ -4,7 +4,10 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Shubhan Mehrotra</title>
-  <link rel="stylesheet" href="style.css?v=4" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css?v=5" />
 </head>
 <body>
 
@@ -16,6 +19,7 @@
     <li><a href="#projects">Projects</a></li>
     <li><a href="#skills">Skills</a></li>
     <li><a href="#contact">Contact</a></li>
+    <li><a href="server.html" class="nav-server-link">Server ↗</a></li>
   </ul>
   <div class="nav-right">
     <span id="status-pill" class="live-pill"><span class="live-dot"></span> Checking...</span>
@@ -44,41 +48,13 @@
   </div>
 </section>
 
-<!-- ── Server Stats ── -->
-<section class="server-stats-section">
-  <div class="server-stats-header">
-    <div>
-      <div class="server-stats-title">Live Server</div>
-      <div class="server-hardware">Google Pixel 7a · ARM64 · Debian Linux · GrapheneOS</div>
-    </div>
-    <span class="live-pill"><span class="live-dot"></span> Live</span>
-  </div>
-  <div id="server-stats-content">
-    <div class="stats-grid">
-      <div class="stat-item">
-        <div class="stat-label">CPU</div>
-        <div class="stat-value" id="stat-cpu-val">—</div>
-        <div class="stat-bar-track"><div class="stat-bar-fill" id="cpu-bar" style="width:0%"></div></div>
-      </div>
-      <div class="stat-item">
-        <div class="stat-label">Memory</div>
-        <div class="stat-value" id="stat-ram-val">—</div>
-        <div class="stat-sub" id="stat-ram-sub">loading...</div>
-        <div class="stat-bar-track"><div class="stat-bar-fill" id="ram-bar" style="width:0%"></div></div>
-      </div>
-      <div class="stat-item">
-        <div class="stat-label">Uptime</div>
-        <div class="stat-value" id="stat-uptime-val">—</div>
-      </div>
-      <div class="stat-item">
-        <div class="stat-label">Disk Free</div>
-        <div class="stat-value" id="stat-disk-val">—</div>
-        <div class="stat-sub" id="stat-disk-sub"></div>
-        <div class="stat-bar-track"><div class="stat-bar-fill" id="disk-bar" style="width:0%"></div></div>
-      </div>
-    </div>
-  </div>
-</section>
+<!-- ── Server strip ── -->
+<div class="server-strip">
+  <span id="strip-pill" class="live-pill strip-pill"><span class="live-dot"></span> Checking…</span>
+  <span class="strip-hw">Google Pixel 7a · ARM64</span>
+  <span class="strip-stats" id="strip-stats"></span>
+  <a href="server.html" class="strip-link">View server dashboard →</a>
+</div>
 
 <!-- ── Currently Working On ── -->
 <section class="section-card">
@@ -323,55 +299,6 @@
   </div>
 </section>
 
-<!-- ── Availability ── -->
-<section class="section-card">
-  <div class="section-title">30-Day Uptime</div>
-  <div id="availability-grid" class="availability-grid"></div>
-  <div class="avail-legend">
-    <div class="avail-legend-item"><span class="avail-legend-dot" style="background:#22c55e"></span>Healthy</div>
-    <div class="avail-legend-item"><span class="avail-legend-dot" style="background:#f59e0b"></span>Degraded</div>
-    <div class="avail-legend-item"><span class="avail-legend-dot" style="background:#ef4444"></span>Incident</div>
-    <div class="avail-legend-item"><span class="avail-legend-dot" style="background:#4a5568"></span>No data yet</div>
-  </div>
-  <div id="availability-summary" class="availability-summary"></div>
-</section>
-
-<!-- ── API Explorer ── -->
-<section class="section-card">
-  <div class="section-title">API Explorer</div>
-  <p class="api-subtitle">Live responses from the Phoneix API running on the Pixel 7a. Click Try to fire a real request.</p>
-  <div class="api-explorer">
-    <div class="api-row" data-path="/v1/ping">
-      <span class="api-badge">GET</span>
-      <code class="api-path">/v1/ping</code>
-      <button class="api-btn" type="button">Try</button>
-    </div>
-    <div class="api-output" id="out-ping" style="display:none"></div>
-
-    <div class="api-row" data-path="/v1/server">
-      <span class="api-badge">GET</span>
-      <code class="api-path">/v1/server</code>
-      <button class="api-btn" type="button">Try</button>
-    </div>
-    <div class="api-output" id="out-server" style="display:none"></div>
-
-    <div class="api-row" data-path="/v1/health">
-      <span class="api-badge">GET</span>
-      <code class="api-path">/v1/health</code>
-      <button class="api-btn" type="button">Try</button>
-    </div>
-    <div class="api-output" id="out-health" style="display:none"></div>
-
-    <div class="api-row" data-path="/v1/now">
-      <span class="api-badge">GET</span>
-      <code class="api-path">/v1/now</code>
-      <button class="api-btn" type="button">Try</button>
-    </div>
-    <div class="api-output" id="out-now" style="display:none"></div>
-  </div>
-  <a href="https://api.shubhanmehrotra.com/docs" target="_blank" class="hero-link" style="display:inline-flex;margin-top:1.5rem">Full Swagger Docs →</a>
-</section>
-
 <!-- ── Contact ── -->
 <section id="contact" class="contact-section">
   <div class="contact-card">
@@ -396,6 +323,6 @@
   </div>
 </footer>
 
-<script src="app.js?v=4"></script>
+<script src="app.js?v=5"></script>
 </body>
 </html>
