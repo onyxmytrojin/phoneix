@@ -4,9 +4,7 @@ import statistics
 from collections import defaultdict
 from datetime import datetime, timezone, timedelta
 
-from fastapi import APIRouter, Depends, Request, Response
-
-from app.config import API_KEY
+from fastapi import APIRouter, Response
 from app.middleware.logging import LOG_PATH
 
 router = APIRouter()
@@ -157,10 +155,7 @@ async def visitors(response: Response):
 
 
 @router.get("/logs")
-async def logs(request: Request, response: Response):
-    key = request.headers.get("X-API-Key")
-    if key != API_KEY:
-        return Response(status_code=401)
+async def logs(response: Response):
     response.headers["Cache-Control"] = "no-store"
-    entries = _read_logs(24)
+    entries = _read_logs(1)
     return {"logs": entries[-50:]}

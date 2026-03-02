@@ -138,22 +138,25 @@ async function updateResponseTimes() {
   const d = await apiFetch('/v1/response-times');
   const el = document.getElementById('srv-resp-times');
   if (!el) return;
-  if (!d || !d.endpoints || d.endpoints.length === 0) {
-    el.innerHTML = '<div class="srv-loading">No data yet — make some requests first.</div>';
+  if (!d || !d.endpoints || Object.keys(d.endpoints).length === 0) {
+    el.innerHTML = '<div class="srv-loading">No data yet.</div>';
     return;
   }
-  const sorted = [...d.endpoints]
-    .sort((a, b) => (b.count ?? 0) - (a.count ?? 0))
+  // endpoints is a dict: { "/v1/ping": { p50, p95, p99, count }, ... }
+  const rows = Object.entries(d.endpoints)
+    .map(([path, s]) => ({ path, avg: s.p50 ?? 0, p95: s.p95 ?? 0, count: s.count ?? 0 }))
+    .filter(e => e.path.startsWith('/v1/'))
+    .sort((a, b) => b.count - a.count)
     .slice(0, 9);
-  const maxAvg = Math.max(...sorted.map(e => e.avg_ms ?? 0), 1);
-  el.innerHTML = sorted.map(e => {
-    const pct = Math.max(2, Math.min(100, ((e.avg_ms ?? 0) / maxAvg) * 100));
+  const maxAvg = Math.max(...rows.map(e => e.avg), 1);
+  el.innerHTML = rows.map(e => {
+    const pct = Math.max(2, Math.min(100, (e.avg / maxAvg) * 100));
     return `
       <div class="resp-row">
         <code class="resp-path">${e.path}</code>
         <div class="resp-bar-wrap"><div class="resp-bar" style="width:${pct}%"></div></div>
-        <span class="resp-val">${(e.avg_ms ?? 0).toFixed(0)}ms</span>
-        <span class="resp-count">${e.count ?? 0}</span>
+        <span class="resp-val">${e.avg.toFixed(0)}ms</span>
+        <span class="resp-count">${e.count}</span>
       </div>`;
   }).join('');
 }
