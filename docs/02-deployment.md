@@ -4,197 +4,171 @@ How to get code from this laptop onto the Pixel 7a.
 
 ---
 
-## Prerequisites
+## SSH Access
 
-Phone is reachable at: `192.168.68.115` (or check current IP)  
-SSH key: `~/.ssh/pixel_key` (or wherever you saved it)  
-Phone must be on same WiFi, or reachable via Cloudflare Tunnel.
+Phone is reachable at: `192.168.68.115` (check current IP if it changes)  
+SSH key: `~/.ssh/pixel_server`  
+User: `root`  
+Port: `22` (dropbear, running inside Debian proot)
 
 ```bash
-# Test SSH connection
-ssh -i ~/.ssh/pixel_key -p 8022 shubhan@192.168.68.115
+# Test connection
+ssh -i ~/.ssh/pixel_server -p 22 root@192.168.68.115
 ```
 
 ---
 
-## Step 1: Create Directory on Phone
+## How Deployment Works
 
-SSH into the phone and create the project directory:
+Everything is managed through git. No SCP needed.
+
+```
+laptop → git push → GitHub → phoneix deploy (git pull on phone) → supervisorctl restart
+```
 
 ```bash
-mkdir -p /var/www/phoneix/api
-mkdir -p /var/www/phoneix/dashboard
-mkdir -p /var/www/phoneix/cache
-mkdir -p /var/www/phoneix/api/logs
-mkdir -p /var/www/phoneix/api/db
+# On laptop — push changes
+git push
+
+# On phone (via SSH or Termux) — pull and restart
+phoneix deploy
+```
+
+`phoneix deploy` runs `git pull` then `supervisorctl restart phoneix` then shows status.
+
+---
+
+## phoneix CLI
+
+The `phoneix` command is at `/usr/local/bin/phoneix` on the phone.
+
+```bash
+phoneix status       # API process + nginx + cloudflared + last 5 requests
+phoneix logs         # last 50 lines of uvicorn.log
+phoneix follow       # tail -f uvicorn.log (live output)
+phoneix errors       # grep errors/exceptions from uvicorn.log
+phoneix requests     # tail -f requests.jsonl (live request stream)
+phoneix restart      # supervisorctl restart phoneix
+phoneix deploy       # git pull + restart
 ```
 
 ---
 
-## Step 2: Deploy the API
+## Process Management
 
-From the laptop, copy API files to the phone:
-
-```bash
-# Copy entire api directory
-scp -i ~/.ssh/pixel_key -P 8022 -r api/app api/requirements.txt shubhan@192.168.68.115:/var/www/phoneix/api/
-```
-
-On the phone, install dependencies and start:
+Supervisord manages uvicorn. Config: `/etc/supervisor/conf.d/phoneix.conf`
 
 ```bash
-# Install Python dependencies
-cd /var/www/phoneix/api
-pip install -r requirements.txt
+# Check status
+supervisorctl -c /etc/supervisor/supervisord.conf status
 
-# Create .env file on phone (do NOT copy from laptop — set manually)
-nano /var/www/phoneix/api/.env
-# Add: GITHUB_TOKEN=<your token>
-# Add: API_KEY=<a random secret string>
-# Add: ENVIRONMENT=production
+# Restart uvicorn
+supervisorctl -c /etc/supervisor/supervisord.conf restart phoneix
 
-# Start in tmux so it survives SSH disconnect
-tmux new -s api
-uvicorn app.main:app --host 0.0.0.0 --port 8000
-# Ctrl+B then D to detach
+# View supervisord log
+tail -f /var/log/supervisor/supervisord.log
 ```
 
-Verify: `curl http://localhost:8000/v1/ping` should return pong JSON.
+Nginx and cloudflared are started via `/usr/local/bin/phoneix-start`, which is called from `/root/.bashrc` if not already running.
 
 ---
 
-## Step 3: Deploy the Dashboard
+## Startup Flow
 
-```bash
-scp -i ~/.ssh/pixel_key -P 8022 dashboard/index.html dashboard/style.css dashboard/app.js shubhan@192.168.68.115:/var/www/phoneix/dashboard/
 ```
+Termux opens → .bashrc runs → checks if supervisord running
+                              → if not: calls phoneix-start
+                                        pgrep nginx || nginx
+                                        pgrep -x cloudflared || cloudflared tunnel run ...
+                                        supervisord --nodaemon &
+                                        supervisorctl restart phoneix
+```
+
+Supervisord runs with `--nodaemon` via nohup — daemonizing breaks proot's ptrace tracking.
+Supervisord uses TCP control socket (`127.0.0.1:9001`) — AF_UNIX sockets don't work through proot.
 
 ---
 
-## Step 4: Configure Nginx
+## Log Files
 
-On the phone, create the nginx config:
+| File | What |
+|------|------|
+| `/var/www/phoneix/api/logs/requests.jsonl` | Every HTTP request (JSON, one per line) |
+| `/var/www/phoneix/api/logs/uvicorn.log` | Uvicorn stdout |
+| `/var/www/phoneix/api/logs/uvicorn.err.log` | Errors and stack traces |
+| `/var/log/supervisor/supervisord.log` | Supervisord events |
+| `/var/www/phoneix/api/logs/cloudflared.log` | Cloudflare Tunnel output |
+
+### Viewing Logs
 
 ```bash
-nano /etc/nginx/sites-available/phoneix
-```
+# Rich terminal log viewer (installed via apt)
+lnav /var/www/phoneix/api/logs/requests.jsonl   # JSON requests, filterable
+lnav /var/www/phoneix/api/logs/uvicorn.log       # app output
 
-Paste:
-```nginx
-# Main dashboard
-server {
-    listen 80;
-    server_name shubhanmehrotra.com;
-    root /var/www/phoneix/dashboard;
-    index index.html;
-
-    # Distributed cache dashboard
-    location /cluster {
-        proxy_pass http://localhost:9000;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-    }
-}
-
-# FastAPI
-server {
-    listen 80;
-    server_name api.shubhanmehrotra.com;
-
-    location / {
-        proxy_pass http://localhost:8000;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-    }
-}
-```
-
-Enable and reload:
-```bash
-ln -s /etc/nginx/sites-available/phoneix /etc/nginx/sites-enabled/phoneix
-nginx -t   # verify config is valid
-nginx -s reload
+# Or use phoneix CLI shortcuts
+phoneix follow     # live uvicorn output
+phoneix requests   # live request stream
+phoneix errors     # errors only
 ```
 
 ---
 
-## Step 5: Add api. Subdomain in Cloudflare
+## Environment Variables
 
-1. Open Cloudflare Tunnel dashboard
-2. Go to your tunnel → Public Hostnames
-3. Add a new hostname:
-   - Subdomain: `api`
-   - Domain: `shubhanmehrotra.com`
-   - Service: HTTP → `localhost:8000`
-4. Save
-
-Visit `api.shubhanmehrotra.com/v1/ping` — should return JSON.
-
----
-
-## Step 6: Deploy the Cache (Week 3+)
-
-The Go cache compiles to a single binary for ARM64.
-Cross-compile from the laptop:
+Stored in `/var/www/phoneix/api/.env` on the phone. Never committed to git.
 
 ```bash
-GOOS=linux GOARCH=arm64 go build -o cache-node ./cache/main.go
-```
-
-Copy binary to phone:
-```bash
-scp -i ~/.ssh/pixel_key -P 8022 cache-node shubhan@192.168.68.115:/var/www/phoneix/cache/
-```
-
-Start three nodes on the phone (in tmux):
-```bash
-tmux new -s cache-a
-/var/www/phoneix/cache/cache-node --id=node-a --port=6001 --peers=localhost:6002,localhost:6003
-# Ctrl+B D
-
-tmux new -s cache-b
-/var/www/phoneix/cache/cache-node --id=node-b --port=6002 --peers=localhost:6001,localhost:6003
-# Ctrl+B D
-
-tmux new -s cache-c
-/var/www/phoneix/cache/cache-node --id=node-c --port=6003 --peers=localhost:6001,localhost:6002
-# Ctrl+B D
+GITHUB_TOKEN=           # GitHub PAT, read:user scope
+API_KEY=                # Secret key for authenticated endpoints
+ENVIRONMENT=production
+BIRTHDATE=              # Used to compute age dynamically (not in source code)
 ```
 
 ---
 
-## Updating Code
+## Nginx
 
-Redeploy workflow (after making changes on laptop):
+Config: `/etc/nginx/nginx.conf`  
+Workers: 2 (reduced from auto/8 — single-user phone doesn't need more)
+
+Routing:
+- `shubhanmehrotra.com` → `/var/www/phoneix/dashboard/` (static files)
+- `api.shubhanmehrotra.com` → `localhost:8000` (FastAPI)
 
 ```bash
-# API update
-scp -i ~/.ssh/pixel_key -P 8022 -r api/app/ shubhan@192.168.68.115:/var/www/phoneix/api/
-ssh -i ~/.ssh/pixel_key -p 8022 shubhan@192.168.68.115 "tmux send-keys -t api C-c ENTER 'uvicorn app.main:app --host 0.0.0.0 --port 8000' ENTER"
-
-# Dashboard update
-scp -i ~/.ssh/pixel_key -P 8022 dashboard/index.html dashboard/style.css dashboard/app.js shubhan@192.168.68.115:/var/www/phoneix/dashboard/
-
-# Cache update (rebuild first)
-GOOS=linux GOARCH=arm64 go build -o cache-node ./cache/main.go
-scp -i ~/.ssh/pixel_key -P 8022 cache-node shubhan@192.168.68.115:/var/www/phoneix/cache/
+nginx -t        # test config
+nginx -s reload # reload without dropping connections
 ```
 
 ---
 
-## Checking Running Processes
+## Cloudflare Tunnel
+
+Tunnel name: configured in `/root/.cloudflared/config.yml`  
+Managed via phoneix-start — pgrep checks prevent duplicate processes accumulating.
 
 ```bash
-# See all tmux sessions
-tmux ls
+# Check tunnel is running
+pgrep -x cloudflared && echo running || echo stopped
 
-# Attach to a session to see logs
-tmux attach -t api
-
-# Check if FastAPI is running
-curl http://localhost:8000/v1/ping
-
-# Check if cache nodes are running
-nc -z localhost 6001 && echo "Node A up"
+# View tunnel log
+tail -f /var/www/phoneix/api/logs/cloudflared.log
 ```
+
+---
+
+## First-Time Phone Setup (reference)
+
+These steps are already done — here for re-setup if needed.
+
+1. Install proot-distro in Termux: `pkg install proot-distro`
+2. Install Debian: `proot-distro install debian`
+3. Log in: `proot-distro login debian`
+4. Install packages: `apt install nginx python3 python3-pip git dropbear supervisor lnav -y`
+5. Clone repo: `git clone https://github.com/onyxmytrojin/phoneix /var/www/phoneix`
+6. Create `.env` with secrets (see above)
+7. Install Python deps: `pip install -r /var/www/phoneix/api/requirements.txt`
+8. Configure supervisord for TCP: `inet_http_server` on `127.0.0.1:9001`
+9. Set up nginx with 2 workers
+10. Run phoneix-start to bring everything up

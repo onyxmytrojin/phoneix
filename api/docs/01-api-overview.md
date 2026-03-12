@@ -14,7 +14,7 @@ Lives at: api.shubhanmehrotra.com
 | Database | SQLite via aiosqlite | Zero setup, file on disk |
 | HTTP client | httpx | Async, needed for GitHub API calls |
 | Env config | python-dotenv | Secrets from .env, never hardcoded |
-| Logging | structlog | JSON logs, queryable for /v1/metrics |
+| Logging | Custom JSON middleware | One JSON line per request to logs/requests.jsonl |
 | Rate limiting | slowapi | Per-IP rate limit via middleware |
 
 ---
@@ -135,11 +135,13 @@ Build in this order — each step gives something working to test:
 # Install dependencies
 pip install -r requirements.txt
 
-# Start server
+# Local dev
 uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
-# In production on phone (inside tmux session)
-uvicorn app.main:app --host 0.0.0.0 --port 8000
+# Production on phone — managed by supervisord (not tmux)
+# Start/restart via phoneix CLI:
+phoneix restart   # supervisorctl restart phoneix
+phoneix deploy    # git pull + restart
 ```
 
 Swagger UI available at: http://localhost:8000/docs  

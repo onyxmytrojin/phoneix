@@ -17,9 +17,10 @@ Cloudflare Tunnel (outbound connection from phone)
     ▼
 Nginx (reverse proxy on phone, port 80/443)
     │
-    ├──► shubhanmehrotra.com          → dashboard/   (static HTML)
-    ├──► api.shubhanmehrotra.com      → api/         (FastAPI, port 8000)
-    └──► shubhanmehrotra.com/cluster  → cache/       (Go HTTP, port 9000)
+    ├──► shubhanmehrotra.com            → dashboard/index.html  (portfolio)
+    ├──► shubhanmehrotra.com/server.html → dashboard/server.html (ops dashboard)
+    ├──► api.shubhanmehrotra.com        → api/         (FastAPI, port 8000)
+    └──► shubhanmehrotra.com/cluster    → cache/       (Go HTTP, port 9000)
 ```
 
 ## Part 1: API + Dashboard
@@ -104,10 +105,17 @@ server {
 3. Cloudflare routes through tunnel to phone
 4. Nginx receives, proxies to localhost:8000
 5. FastAPI router handles /v1/server
-6. Handler reads /proc/meminfo and /proc/stat
+6. Handler reads /proc/meminfo (RAM), /proc/loadavg + cpufreq (CPU blend), uptime offset
 7. Returns JSON with CPU%, RAM, uptime
 8. Response flows back through Nginx → Tunnel → Cloudflare → Browser
 ```
+
+### proot Limitations
+
+`/proc/stat` and `/proc/uptime` are frozen at proot startup — they never update.
+Workarounds used:
+- **CPU%**: blend of `load_1min / ncpu` (from `/proc/loadavg`, which IS live) and efficiency-core frequency ratio (from `/sys/devices/system/cpu/cpu0-3/cpufreq/scaling_cur_freq`)
+- **Uptime**: capture the frozen `/proc/uptime` value at module load, add `time.time() - start_clock` on each request
 
 ## Data Flow: Cache Request
 
@@ -129,9 +137,10 @@ server {
 | Database | SQLite | Zero setup, file-based, enough for this scale |
 | Dashboard | Vanilla JS | No build step, loads fast, no dependencies |
 | Cache | Go | ARM64 native binary, goroutines for concurrency |
-| Proxy | Nginx | Already installed, simple config |
-| Process manager | tmux | Keep processes alive in proot without systemd |
-| Logging | structlog (Python) | JSON logs, queryable |
+| Proxy | Nginx (2 workers) | Already installed, simple config |
+| Process manager | supervisord | Auto-restart, TCP control socket (AF_UNIX doesn't work through proot ptrace) |
+| Log viewer | lnav | Colorized, filterable JSON log browser |
+| Logging | Custom JSON middleware | One line per request to logs/requests.jsonl |
 
 ## File Locations on Phone
 

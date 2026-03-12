@@ -1,15 +1,14 @@
 # Dashboard Implementation Guide
 
-Vanilla HTML + CSS + JavaScript.
+Vanilla HTML + CSS + JavaScript. Two pages.
 No framework, no build step, no dependencies.
-Lives at: shubhanmehrotra.com
 
 ---
 
 ## Why Vanilla
 
 - No npm, no webpack, no node_modules to manage on the phone
-- Single HTML file can be copied straight to the phone
+- Files are served directly by nginx as static assets
 - Loads instantly — no bundle parsing
 - The complexity is in the backend, not the frontend
 
@@ -19,135 +18,141 @@ Lives at: shubhanmehrotra.com
 
 ```
 dashboard/
-├── index.html       ← single page, everything lives here
-├── style.css        ← all styles
-├── app.js           ← all JavaScript, API calls, DOM updates
+├── index.html       ← portfolio page (hero, GitHub, projects, skills, experience)
+├── style.css        ← shared styles for index.html
+├── app.js           ← JS for index.html
+├── server.html      ← server ops dashboard (stats, response times, live feed, API explorer)
+├── server.css       ← styles scoped to .srv-body (dark dot-grid theme)
+├── server.js        ← JS for server.html
 └── docs/            ← these files
+```
+
+Cache-busting is done via `?v=N` query string on script/style tags. Bump the version in the HTML when deploying JS/CSS changes.
+
+---
+
+## index.html — Portfolio Page
+
+### Sections
+
+| Section | Data source | Refresh |
+|---------|------------|---------|
+| Hero (greeting, photo, links) | `/v1/cv`, `/v1/github` (avatar) | On load |
+| Server strip (CPU, uptime) | `/v1/server` | Every 10s |
+| Currently Building | `/v1/now` | On load |
+| GitHub Activity | `/v1/github` | On load, then every 5min |
+| Projects | `/v1/projects` | On load |
+| Skills | Static HTML | — |
+| Experience / Education | Static HTML (tabs) | — |
+| Contact | Static HTML | — |
+
+### Server Strip
+
+Slim bar between hero and "Currently Building". Shows live CPU% and uptime with a "Live" pill. Links to server.html.
+
+```html
+<div class="server-strip">
+  <span id="strip-pill" ...></span>
+  <span class="strip-hw">Google Pixel 7a · ARM64</span>
+  <span class="strip-stats" id="strip-stats"></span>
+  <a href="server.html">View server dashboard →</a>
+</div>
 ```
 
 ---
 
-## Sections and Data Sources
+## server.html — Server Ops Dashboard
 
-### 1. Header
-- Name and title (static)
-- Status pill: "Server online · 3d uptime" — calls /v1/ping
-- Refreshes every 30 seconds
-- Green blinking dot if ping < 500ms, red if unreachable
+Audience: anyone curious about how the server works, or to demo the ops side of the project.
 
-### 2. Currently Working On
-- Calls /v1/now
-- Shows: project name, description, start date, tags
-- Refreshes once on load (this data doesn't change second-to-second)
+### Sections
 
-### 3. Server Stats ← the unique card
-- Calls /v1/server every 5 seconds
-- CPU usage bar (animated, like a progress bar)
-- RAM: "3.2 GB used / 5.8 GB total"
-- Uptime: "3d 14h 22m"
-- Small label: "Google Pixel 7a · ARM64 · Debian Linux"
-- Blinking green dot — proves it's live right now, not a static page
+| Section | Data source | Refresh |
+|---------|------------|---------|
+| Hero (uptime counter) | `/v1/server` | Every 5s |
+| Stat cards (CPU, RAM, Disk, Load) | `/v1/server` | Every 5s |
+| 30-Day Uptime grid | `/v1/availability` | Every 5min |
+| Response Times bars | `/v1/response-times` | Every 60s |
+| Live Request Feed | `/v1/logs` | Every 5s |
+| API Explorer (13 endpoints) | live fetch on button click | On demand |
 
-### 4. GitHub Activity
-- Calls /v1/github once on load, then every 5 minutes
-- Last 5 commits with repo name, message, time ago
-- Top 3 languages shown as percentage bars
+### Response Times Format
 
-### 5. Projects
-- Calls /v1/projects once on load
-- Card per project: name, description, language, star count, last commit
-- Links to GitHub repo and live demo
+`/v1/response-times` returns a dict keyed by path — not an array:
+```json
+{ "endpoints": { "/v1/ping": { "p50": 23, "p95": 123, "p99": 186, "count": 919 } } }
+```
+server.js converts with `Object.entries(d.endpoints).map(([path, s]) => ({path, avg: s.p50, ...}))`.
 
-### 6. Skills
-- Calls /v1/skills once on load
-- Grouped by category
-- Clean tag-style display, not bars (bars imply false precision)
+### Live Feed
 
-### 7. API Explorer
-- Shows 3-4 live API responses inline on the page
-- "Try it" button per endpoint — fetches and shows raw JSON
-- Links to api.shubhanmehrotra.com/docs
-- Proves the API is real and working
-
-### 8. 30-Day Availability
-- Calls /v1/availability
-- Grid of 30 coloured squares (like GitHub contribution graph)
-- Green = 100% uptime, yellow = degraded, red = incident
-- Shows I care about uptime
-
-### 9. Footer
-- "Served from a Google Pixel 7a"
-- Last API response time in ms (from most recent call)
-- Link to GitHub repo
-
----
-
-## Auto-refresh Schedule
-
-| Section | Refresh interval |
-|---------|-----------------|
-| Server stats (CPU, RAM) | 5 seconds |
-| Header ping / status | 30 seconds |
-| GitHub activity | 5 minutes |
-| Everything else | On page load only |
+`/v1/logs` returns the last 50 requests from the past hour. No auth required. server.js polls every 5s and renders color-coded rows (method + status).
 
 ---
 
 ## JavaScript Patterns
 
-### Fetch with timeout and error handling
-Every API call wraps fetch with a 5-second timeout.
-If the API is unreachable, the section shows "Unavailable" — not a broken blank card.
-
+### apiFetch (app.js)
 ```javascript
-async function fetchWithTimeout(url, ms = 5000) {
+async function apiFetch(path, timeoutMs = 6000) {
   const controller = new AbortController();
-  const id = setTimeout(() => controller.abort(), ms);
+  const id = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const res = await fetch(url, { signal: controller.signal });
+    const res = await fetch(`${API_BASE}${path}`, { signal: controller.signal });
     clearTimeout(id);
     return res.ok ? res.json() : null;
-  } catch {
-    return null;
-  }
+  } catch { return null; }
+}
+```
+
+### apiFetch (server.js — supports text format for Prometheus)
+```javascript
+async function apiFetch(path, { timeout = 8000, format = 'json' } = {}) {
+  ...
+  return format === 'text' ? res.text() : res.json();
 }
 ```
 
 ### Time ago helper
-Commits and events show "2 hours ago" not raw timestamps.
-
-### Loading states
-Each card shows a skeleton placeholder while loading.
-Data appears when the fetch completes.
+Both pages have `timeAgo(isoStr)` — converts ISO timestamp to "4s ago", "2m ago", etc.
 
 ---
 
-## Deployment on Phone
+## Auto-Refresh Schedule
 
-Dashboard files go to: `/var/www/phoneix/dashboard/`
-Nginx serves this directory for shubhanmehrotra.com requests.
+### index.html (app.js)
+| Function | Interval |
+|----------|----------|
+| updateServerStrip | 10s |
+| updateStatusPill | 30s |
+| updateGithub | 5min |
+
+### server.html (server.js)
+| Function | Interval |
+|----------|----------|
+| updateStats + updateFeed | 5s |
+| updateStatusPill | 30s |
+| updateResponseTimes | 60s |
+| updateAvailability | 5min |
+
+---
+
+## Theme
+
+Both pages support light/dark toggle. Theme is stored in `localStorage.theme`. Dark mode adds `dark` class to `<body>`. server.html also has `.srv-body` class — server.css is scoped to it so styles don't bleed into index.html.
+
+---
+
+## Deployment
 
 ```bash
-# From laptop — copy files to phone via SSH
-scp -i ~/.ssh/pixel_key dashboard/index.html shubhan@192.168.68.115:/var/www/phoneix/dashboard/
-scp -i ~/.ssh/pixel_key dashboard/style.css shubhan@192.168.68.115:/var/www/phoneix/dashboard/
-scp -i ~/.ssh/pixel_key dashboard/app.js shubhan@192.168.68.115:/var/www/phoneix/dashboard/
+# On laptop — push to GitHub
+git add dashboard/
+git commit -m "update dashboard"
+git push
+
+# On phone (via SSH or Termux) — pull and restart API
+phoneix deploy
 ```
 
-After deploying, visit shubhanmehrotra.com to verify.
-
----
-
-## Build Order
-
-1. `index.html` skeleton — layout only, hardcoded placeholder text
-2. `style.css` — dark theme, card grid layout, responsive
-3. Server stats card — wire to /v1/server, 5-second refresh
-4. Header with status pill — wire to /v1/ping, 30-second refresh
-5. GitHub activity section — wire to /v1/github
-6. Projects section — wire to /v1/projects
-7. API Explorer — fetch and render live JSON
-8. Skills section
-9. Availability timeline
-10. Test on mobile (the phone itself, viewing its own dashboard)
-11. Deploy to phone
+nginx serves the dashboard directory as static files — no restart needed for HTML/CSS/JS changes, just `git pull`. API restart is only needed for Python changes.

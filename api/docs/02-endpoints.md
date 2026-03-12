@@ -77,10 +77,10 @@ Response headers: `Cache-Control: no-store`
 ```
 
 Data sources:
-- CPU: `/proc/stat` (two reads, 100ms apart, calculate delta)
+- CPU: blend of `/proc/loadavg` (load_1min/ncpu) and `/sys/devices/system/cpu/cpu0-3/cpufreq/scaling_cur_freq` — `/proc/stat` is frozen in proot
 - Memory: `/proc/meminfo`
 - Disk: `shutil.disk_usage("/")`
-- Uptime: `/proc/uptime`
+- Uptime: frozen `/proc/uptime` value captured at startup + `time.time()` elapsed — `/proc/uptime` doesn't tick in proot
 
 ---
 
@@ -228,18 +228,22 @@ P50/P95/P99 per endpoint, last 24 hours. Computed from log file.
 ```
 
 ### GET /v1/availability
-Uptime per day for last 90 days.
+Uptime per day for last 30 days. Computed from request log — any day with a 5xx error rate ≥5% is "degraded", ≥50% is "incident". Days with no requests show `"status": "no_data"` but default uptime 100%.
 ```json
 {
-  "today": { "uptime_percent": 100.0, "incidents": 0 },
-  "last_7_days": { "uptime_percent": 99.8 },
-  "last_30_days": { "uptime_percent": 99.5 },
-  "last_90_days": { "uptime_percent": 99.1 }
+  "days": [
+    { "date": "2026-07-06", "uptime_percent": 100.0, "status": "healthy", "requests": 856 },
+    { "date": "2026-07-05", "uptime_percent": 100.0, "status": "no_data", "requests": 0 }
+  ],
+  "summary": {
+    "last_30_days": 100.0,
+    "today": 100.0
+  }
 }
 ```
 
 ### GET /v1/logs
-Last 50 request logs. Requires API key.
+Last 50 request logs from the past hour. Public — no auth required (logs contain only hashed IPs, no PII).
 ```json
 {
   "logs": [
