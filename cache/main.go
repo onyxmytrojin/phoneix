@@ -13,7 +13,7 @@ func main() {
 	fmt.Printf("Starting Phoneix Cache — node=%s port=%d peers=%v\n",
 		cfg.NodeID, cfg.Port, cfg.Peers)
 
-	srv := node.NewServer(cfg.NodeID, cfg.Port)
+	srv := node.NewServer(cfg)
 	if err := srv.Listen(); err != nil {
 		fmt.Fprintf(os.Stderr, "fatal: %v\n", err)
 		os.Exit(1)
