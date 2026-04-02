@@ -75,6 +75,43 @@ func (s *Server) dispatch(line string) string {
 	case "PING":
 		return "PONG " + s.nodeID
 
+	// ── Internal replication commands ────────────────────────────────────────
+	// These bypass the ring — replicas receive them directly from the primary.
+
+	case "LOCALSET":
+		// LOCALSET key value [ttl_seconds]
+		if len(parts) < 3 {
+			return "ERR LOCALSET key value [ttl]"
+		}
+		var ttl time.Duration
+		if len(parts) >= 4 {
+			if secs, err := strconv.Atoi(parts[3]); err == nil && secs > 0 {
+				ttl = time.Duration(secs) * time.Second
+			}
+		}
+		s.store.Set(parts[1], parts[2], ttl)
+		return "OK"
+
+	case "LOCALGET":
+		// LOCALGET key — read from this node's store directly, no routing
+		if len(parts) < 2 {
+			return "ERR LOCALGET key"
+		}
+		v, ok := s.store.Get(parts[1])
+		if !ok {
+			return "MISS"
+		}
+		return v
+
+	case "LOCALDEL":
+		if len(parts) < 2 {
+			return "ERR LOCALDEL key"
+		}
+		s.store.Del(parts[1])
+		return "OK"
+
+	// ── Client-facing commands ────────────────────────────────────────────────
+
 	case "SET":
 		if len(parts) < 3 {
 			return "ERR SET key value [ttl]"
@@ -92,6 +129,7 @@ func (s *Server) dispatch(line string) string {
 			ttl = time.Duration(secs) * time.Second
 		}
 		s.store.Set(key, parts[2], ttl)
+		go s.replicate(key, parts[2], ttl, false) // async replica write
 		return "OK"
 
 	case "GET":
@@ -99,14 +137,23 @@ func (s *Server) dispatch(line string) string {
 			return "ERR GET key"
 		}
 		key := parts[1]
-		if owner := s.router.OwnerOf(key); owner != s.nodeID {
-			return s.forward(owner, line)
+		owner := s.router.OwnerOf(key)
+		if owner == s.nodeID {
+			v, ok := s.store.Get(key)
+			if !ok {
+				return "MISS"
+			}
+			return v
 		}
-		v, ok := s.store.Get(key)
-		if !ok {
+		// Forward to primary; on failure fall back to replica
+		resp, err := s.router.Forward(owner, line)
+		if err != nil {
+			if v, ok := s.readFromReplica(key); ok {
+				return v
+			}
 			return "MISS"
 		}
-		return v
+		return resp
 
 	case "DEL":
 		if len(parts) < 2 {
@@ -116,7 +163,9 @@ func (s *Server) dispatch(line string) string {
 		if owner := s.router.OwnerOf(key); owner != s.nodeID {
 			return s.forward(owner, line)
 		}
-		if s.store.Del(key) {
+		existed := s.store.Del(key)
+		go s.replicate(key, "", 0, true) // async replica delete
+		if existed {
 			return "OK"
 		}
 		return "MISS"
