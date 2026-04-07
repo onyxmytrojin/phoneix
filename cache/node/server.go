@@ -18,6 +18,7 @@ type Server struct {
 	port      int
 	store     *Store
 	router    *cluster.Router
+	gossip    *cluster.Gossip
 	startedAt time.Time
 	requests  uint64
 }
@@ -27,13 +28,18 @@ func NewServer(cfg *config.Config) *Server {
 	for id, addr := range cfg.Peers {
 		router.AddPeer(id, addr)
 	}
-	return &Server{
+	s := &Server{
 		nodeID:    cfg.NodeID,
 		port:      cfg.Port,
 		store:     NewStore(),
 		router:    router,
 		startedAt: time.Now(),
 	}
+	if len(cfg.Peers) > 0 {
+		s.gossip = cluster.NewGossip(cfg.NodeID, router)
+		s.gossip.Start()
+	}
+	return s
 }
 
 func (s *Server) Listen() error {
@@ -192,7 +198,14 @@ func (s *Server) dispatch(line string) string {
 			"keys_held":      s.store.Keys(),
 			"uptime_seconds": uptime,
 			"requests_total": s.requests,
-			"peers":          s.router.PeerAddrs(),
+		}
+		if s.gossip != nil {
+			peerInfos := s.gossip.Peers()
+			peerMap := make(map[string]string, len(peerInfos))
+			for _, p := range peerInfos {
+				peerMap[p.ID] = p.Status
+			}
+			info["peer_states"] = peerMap
 		}
 		b, _ := json.Marshal(info)
 		return string(b)
@@ -204,14 +217,20 @@ func (s *Server) dispatch(line string) string {
 		switch strings.ToUpper(parts[1]) {
 		case "NODES":
 			type nodeInfo struct {
-				ID   string `json:"id"`
-				Addr string `json:"addr,omitempty"`
-				Self bool   `json:"self,omitempty"`
+				ID     string `json:"id"`
+				Addr   string `json:"addr,omitempty"`
+				Status string `json:"status"`
+				Self   bool   `json:"self,omitempty"`
 			}
-			var nodes []nodeInfo
-			nodes = append(nodes, nodeInfo{ID: s.nodeID, Self: true})
-			for id, addr := range s.router.PeerAddrs() {
-				nodes = append(nodes, nodeInfo{ID: id, Addr: addr})
+			nodes := []nodeInfo{{ID: s.nodeID, Status: "alive", Self: true}}
+			if s.gossip != nil {
+				for _, p := range s.gossip.Peers() {
+					nodes = append(nodes, nodeInfo{ID: p.ID, Addr: p.Addr, Status: p.Status})
+				}
+			} else {
+				for id, addr := range s.router.PeerAddrs() {
+					nodes = append(nodes, nodeInfo{ID: id, Addr: addr, Status: "alive"})
+				}
 			}
 			b, _ := json.Marshal(nodes)
 			return string(b)
