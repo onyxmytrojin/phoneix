@@ -37,6 +37,7 @@ func NewServer(cfg *config.Config) *Server {
 	}
 	if len(cfg.Peers) > 0 {
 		s.gossip = cluster.NewGossip(cfg.NodeID, router)
+		s.gossip.OnRecovery = func(id string) { s.migrateToRecoveredNode(id) }
 		s.gossip.Start()
 	}
 	return s
@@ -146,15 +147,20 @@ func (s *Server) dispatch(line string) string {
 		owner := s.router.OwnerOf(key)
 		if owner == s.nodeID {
 			v, ok := s.store.Get(key)
-			if !ok {
-				return "MISS"
+			if ok {
+				return v
 			}
-			return v
+			// We became the owner after a topology change but don't hold a copy.
+			// Ask all live peers — one of them has the original replica.
+			if v, ok := s.readFromAnyPeer(key); ok {
+				return v
+			}
+			return "MISS"
 		}
-		// Forward to primary; on failure fall back to replica
+		// Forward to primary; on failure fan out to all peers.
 		resp, err := s.router.Forward(owner, line)
 		if err != nil {
-			if v, ok := s.readFromReplica(key); ok {
+			if v, ok := s.readFromAnyPeer(key); ok {
 				return v
 			}
 			return "MISS"
@@ -245,6 +251,18 @@ func (s *Server) dispatch(line string) string {
 			return "ERR unknown CLUSTER subcommand"
 		}
 
+	case "KEYS":
+		keys := make([]string, 0)
+		for k := range s.store.All() {
+			keys = append(keys, k)
+		}
+		b, _ := json.Marshal(keys)
+		return string(b)
+
+	case "MIGRATE":
+		n := s.migrate()
+		return fmt.Sprintf("MIGRATED:%d", n)
+
 	default:
 		return "ERR unknown command " + cmd
 	}
@@ -256,4 +274,59 @@ func (s *Server) forward(nodeID, command string) string {
 		return "ERR forward to " + nodeID + ": " + err.Error()
 	}
 	return resp
+}
+
+// migrate walks the local store and forwards any key whose ring-owner is not
+// this node. Called on startup, on MIGRATE command, and after a peer recovers.
+// Returns the number of keys moved out.
+func (s *Server) migrate() int {
+	all := s.store.All()
+	moved := 0
+	for key, value := range all {
+		owner := s.router.OwnerOf(key)
+		if owner == s.nodeID {
+			continue
+		}
+		ttl := s.store.TTL(key)
+		var cmd string
+		if ttl > 0 {
+			cmd = fmt.Sprintf("LOCALSET %s %s %d", key, value, ttl)
+		} else {
+			cmd = fmt.Sprintf("LOCALSET %s %s", key, value)
+		}
+		if _, err := s.router.Forward(owner, cmd); err == nil {
+			s.store.Del(key)
+			moved++
+		}
+	}
+	if moved > 0 {
+		fmt.Printf("[%s] migrate: moved %d keys to correct owners\n", s.nodeID, moved)
+	}
+	return moved
+}
+
+// migrateToRecoveredNode pushes keys that now belong to recoveredID.
+// Called by gossip.OnRecovery after the recovered peer is added back to the ring.
+func (s *Server) migrateToRecoveredNode(recoveredID string) {
+	all := s.store.All()
+	moved := 0
+	for key, value := range all {
+		if s.router.OwnerOf(key) != recoveredID {
+			continue
+		}
+		ttl := s.store.TTL(key)
+		var cmd string
+		if ttl > 0 {
+			cmd = fmt.Sprintf("LOCALSET %s %s %d", key, value, ttl)
+		} else {
+			cmd = fmt.Sprintf("LOCALSET %s %s", key, value)
+		}
+		if _, err := s.router.Forward(recoveredID, cmd); err == nil {
+			s.store.Del(key)
+			moved++
+		}
+	}
+	if moved > 0 {
+		fmt.Printf("[%s] rebalance: pushed %d keys to recovered %s\n", s.nodeID, moved, recoveredID)
+	}
 }

@@ -33,24 +33,20 @@ func (s *Server) replicate(key, value string, ttl time.Duration, del bool) {
 	}
 }
 
-// readFromReplica tries to read key from the replica node when the primary
-// is unreachable. Returns value, found.
-func (s *Server) readFromReplica(key string) (string, bool) {
-	owners := s.router.Ring().GetNodes(key, 2)
-	if len(owners) < 2 {
-		return "", false
+// readFromAnyPeer sends LOCALGET to every live peer and returns the first hit.
+// Used when the ring-determined primary doesn't hold the key — e.g. after a
+// topology change where a recovered node becomes the new owner but the replica
+// is on a different live node.
+func (s *Server) readFromAnyPeer(key string) (string, bool) {
+	// Check self first (e.g. we are the replica via a different ring position).
+	if v, ok := s.store.Get(key); ok {
+		return v, true
 	}
-	replicaID := owners[1]
-
-	// If we ARE the replica, read locally.
-	if replicaID == s.nodeID {
-		return s.store.Get(key)
+	for nodeID := range s.router.PeerAddrs() {
+		resp, err := s.router.Forward(nodeID, "LOCALGET "+key)
+		if err == nil && resp != "MISS" {
+			return resp, true
+		}
 	}
-
-	// Otherwise forward a LOCALGET to the replica (bypasses routing on their end).
-	resp, err := s.router.Forward(replicaID, "LOCALGET "+key)
-	if err != nil || resp == "MISS" {
-		return "", false
-	}
-	return resp, true
+	return "", false
 }

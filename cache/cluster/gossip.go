@@ -43,10 +43,11 @@ type PeerInfo struct {
 // Gossip runs a heartbeat loop every 500ms. After 3 missed heartbeats a node
 // is marked dead and removed from the ring. When it recovers it's added back.
 type Gossip struct {
-	mu     sync.Mutex
-	myID   string
-	router *Router
-	peers  map[string]*peerState
+	mu         sync.Mutex
+	myID       string
+	router     *Router
+	peers      map[string]*peerState
+	OnRecovery func(peerID string) // called (in a new goroutine) when a dead peer comes back
 }
 
 func NewGossip(myID string, router *Router) *Gossip {
@@ -108,6 +109,9 @@ func (g *Gossip) pingPeer(p *peerState) {
 		if was != StatusAlive {
 			g.router.AddPeer(p.id, p.addr)
 			fmt.Printf("[%s] gossip: %s recovered → added back to ring\n", g.myID, p.id)
+			if g.OnRecovery != nil {
+				go g.OnRecovery(p.id)
+			}
 		}
 		return
 	}

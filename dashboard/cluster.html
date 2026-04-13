@@ -1,0 +1,618 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Phoneix Cache · Cluster</title>
+<style>
+:root {
+  --bg:       #0e1117;
+  --surface:  #161c27;
+  --border:   #252d3d;
+  --text:     #e4eaf5;
+  --muted:    #6e7d99;
+  --accent:   #4c8ef7;
+  --alive:    #34c47c;
+  --suspect:  #f0a500;
+  --dead:     #e05252;
+  --mono: "Cascadia Code","JetBrains Mono","Fira Mono",ui-monospace,"Courier New",monospace;
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    --bg:      #f0f4fa;
+    --surface: #ffffff;
+    --border:  #d5dff0;
+    --text:    #1a2035;
+    --muted:   #7a8aaa;
+    --accent:  #2a72e8;
+    --alive:   #1a9e5c;
+    --suspect: #c47d00;
+    --dead:    #c23737;
+  }
+}
+:root[data-theme="dark"]  { --bg:#0e1117;--surface:#161c27;--border:#252d3d;--text:#e4eaf5;--muted:#6e7d99;--accent:#4c8ef7;--alive:#34c47c;--suspect:#f0a500;--dead:#e05252; }
+:root[data-theme="light"] { --bg:#f0f4fa;--surface:#ffffff;--border:#d5dff0;--text:#1a2035;--muted:#7a8aaa;--accent:#2a72e8;--alive:#1a9e5c;--suspect:#c47d00;--dead:#c23737; }
+
+*,*::before,*::after { box-sizing:border-box; margin:0; padding:0; }
+
+html,body {
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+/* ── Header ──────────────────────────────────────────────────── */
+.hdr {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  padding: 0 24px;
+  height: 52px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+
+.hdr-title {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: .04em;
+  white-space: nowrap;
+}
+.hdr-title .dim { color: var(--muted); font-weight: 400; }
+
+.hdr-stats {
+  display: flex;
+  gap: 20px;
+  margin-right: auto;
+}
+
+.stat {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+.stat-val {
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+.stat-lbl {
+  font-size: 10px;
+  color: var(--muted);
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.hdr-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.ts {
+  font-size: 11px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.ts.error { color: var(--dead); }
+
+.btn {
+  padding: 5px 13px;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: .04em;
+  cursor: pointer;
+  transition: border-color .15s, color .15s;
+}
+.btn:hover { border-color: var(--accent); color: var(--accent); }
+.btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.btn:disabled { opacity: .45; cursor: default; pointer-events: none; }
+
+/* ── Page body ───────────────────────────────────────────────── */
+.body {
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-width: 1080px;
+}
+
+/* ── Top row: 3 node cards + ring ─────────────────────────────── */
+.top-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr) 196px;
+  gap: 12px;
+  align-items: start;
+}
+
+/* ── Node card ───────────────────────────────────────────────── */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  overflow: hidden;
+}
+
+.card-hdr {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 9px 13px;
+  border-bottom: 1px solid var(--border);
+}
+
+.node-id {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: .03em;
+}
+
+.badge {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10px;
+  letter-spacing: .07em;
+  text-transform: uppercase;
+}
+
+.dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.dot.alive       { background: var(--alive); box-shadow: 0 0 0 2px color-mix(in srgb, var(--alive) 22%, transparent); }
+.dot.suspect     { background: var(--suspect); }
+.dot.dead        { background: var(--dead); }
+.dot.unreachable { background: var(--muted); }
+
+.badge-text.alive       { color: var(--alive); }
+.badge-text.suspect     { color: var(--suspect); }
+.badge-text.dead        { color: var(--dead); }
+.badge-text.unreachable { color: var(--muted); }
+
+.card-body {
+  padding: 11px 13px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.mrow {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+.mlbl {
+  font-size: 10px;
+  color: var(--muted);
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+.mval {
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.mval.big {
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.divider {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 2px 0;
+}
+
+.peer-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.peer-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.peer-id-lbl { font-size: 11px; color: var(--muted); }
+
+.peer-pill {
+  font-size: 10px;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  padding: 1px 6px;
+  border-radius: 3px;
+}
+.peer-pill.alive   { background: color-mix(in srgb, var(--alive) 14%, transparent); color: var(--alive); }
+.peer-pill.suspect { background: color-mix(in srgb, var(--suspect) 14%, transparent); color: var(--suspect); }
+.peer-pill.dead    { background: color-mix(in srgb, var(--dead) 14%, transparent); color: var(--dead); }
+
+.card-error {
+  font-size: 11px;
+  color: var(--dead);
+  padding: 11px 13px;
+  word-break: break-all;
+  line-height: 1.5;
+}
+
+/* ── Ring panel ──────────────────────────────────────────────── */
+.ring-panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 12px 10px 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+.ring-lbl {
+  font-size: 10px;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--muted);
+  align-self: flex-start;
+}
+#ring-svg { width: 100%; max-width: 172px; }
+
+/* ── Event log ───────────────────────────────────────────────── */
+.log {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  overflow: hidden;
+}
+.log-hdr {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 7px 13px;
+  border-bottom: 1px solid var(--border);
+}
+.log-title {
+  font-size: 10px;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.log-body {
+  max-height: 140px;
+  overflow-y: auto;
+}
+.log-empty {
+  padding: 14px 13px;
+  font-size: 11px;
+  color: var(--muted);
+}
+.ev {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 5px 13px;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 55%, transparent);
+  font-size: 11px;
+}
+.ev:last-child { border-bottom: none; }
+.ev-time { color: var(--muted); font-variant-numeric: tabular-nums; min-width: 54px; flex-shrink: 0; }
+.ev-dot  { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+.ev-dot.alive   { background: var(--alive); }
+.ev-dot.suspect { background: var(--suspect); }
+.ev-dot.dead    { background: var(--dead); }
+.ev-dot.info    { background: var(--accent); }
+.ev-text { color: var(--text); }
+
+/* ── Toast ───────────────────────────────────────────────────── */
+.toast {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 9px 14px;
+  font-size: 12px;
+  max-width: 320px;
+  box-shadow: 0 4px 18px color-mix(in srgb, #000 45%, transparent);
+  opacity: 0;
+  transform: translateY(6px);
+  transition: opacity .2s, transform .2s;
+  pointer-events: none;
+  z-index: 200;
+  word-break: break-all;
+}
+.toast.show { opacity: 1; transform: translateY(0); }
+
+/* ── Responsive ──────────────────────────────────────────────── */
+@media (max-width: 860px) {
+  .top-row { grid-template-columns: repeat(3, 1fr); }
+  .ring-panel { display: none; }
+}
+@media (max-width: 560px) {
+  .top-row { grid-template-columns: 1fr; }
+  .hdr-stats { gap: 14px; }
+}
+</style>
+</head>
+<body>
+
+<header class="hdr">
+  <div class="hdr-title">phoneix <span class="dim">/ cache cluster</span></div>
+  <div class="hdr-stats">
+    <div class="stat">
+      <div class="stat-val" id="alive-count">—</div>
+      <div class="stat-lbl">nodes alive</div>
+    </div>
+    <div class="stat">
+      <div class="stat-val" id="total-keys">—</div>
+      <div class="stat-lbl">total keys</div>
+    </div>
+  </div>
+  <div class="hdr-right">
+    <span class="ts" id="ts">connecting…</span>
+    <button class="btn" id="btn-rebalance" onclick="triggerRebalance()">rebalance</button>
+  </div>
+</header>
+
+<div class="body">
+  <div class="top-row" id="top-row">
+    <div style="grid-column:1/-1;padding:32px 0;color:var(--muted);font-size:12px;text-align:center;letter-spacing:.05em">
+      connecting to cluster…
+    </div>
+  </div>
+
+  <div class="log">
+    <div class="log-hdr">
+      <span class="log-title">gossip events</span>
+    </div>
+    <div class="log-body" id="log-body">
+      <div class="log-empty">Watching for state changes…</div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const API = window.location.origin;
+let prevStates = {};
+let events     = [];
+let busy       = false;
+
+const sc = s => ['alive','suspect','dead'].includes(s) ? s : 'unreachable';
+
+function fmtUp(s) {
+  if (s == null) return '—';
+  if (s < 60) return `${s}s`;
+  if (s < 3600) return `${Math.floor(s/60)}m ${s%60}s`;
+  return `${Math.floor(s/3600)}h ${Math.floor((s%3600)/60)}m`;
+}
+
+function hhmm() { return new Date().toTimeString().slice(0,8); }
+
+function pushEvent(node, from, to) {
+  const cls = to === 'alive' ? 'alive' : to === 'dead' ? 'dead' : to === 'suspect' ? 'suspect' : 'info';
+  const text = from ? `${node}  ${from} → ${to}` : `${node}  ${to}`;
+  events.unshift({ time: hhmm(), cls, text });
+  if (events.length > 25) events.pop();
+  renderLog();
+}
+
+function renderLog() {
+  const el = document.getElementById('log-body');
+  if (!events.length) {
+    el.innerHTML = '<div class="log-empty">Watching for state changes…</div>';
+    return;
+  }
+  el.innerHTML = events.map(e =>
+    `<div class="ev">
+      <span class="ev-time">${e.time}</span>
+      <span class="ev-dot ${e.cls}"></span>
+      <span class="ev-text">${e.text}</span>
+    </div>`
+  ).join('');
+}
+
+// ── Ring SVG ──────────────────────────────────────────────────
+function ringNode(cx, cy, r, angleDeg, node, i) {
+  const a = angleDeg * Math.PI / 180;
+  const x = cx + r * Math.cos(a);
+  const y = cy + r * Math.sin(a);
+  const s = sc(node.status);
+  const colorVar = `var(--${s === 'unreachable' ? 'muted' : s})`;
+  const dim = (s === 'dead' || s === 'unreachable') ? 0.35 : 1;
+  const keys = node.keys_held ?? '';
+  const lFactor = r + 22;
+  const lx = cx + lFactor * Math.cos(a);
+  const ly = cy + lFactor * Math.sin(a);
+  const shortId = (node.id || node.node_id || `n${i}`).replace('node-','');
+  return {x, y, colorVar, dim, keys, lx, ly, shortId, s};
+}
+
+function buildRing(nodes) {
+  const cx = 96, cy = 96, r = 60;
+  const angles = [-90, 30, 150];
+
+  const pts = nodes.slice(0,3).map((node, i) => ringNode(cx, cy, r, angles[i], node, i));
+
+  // Ring circle
+  let svg = `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="var(--border)" stroke-width="1.5"/>`;
+
+  // Chord lines between nodes (ring topology)
+  for (let i = 0; i < pts.length; i++) {
+    const a = pts[i], b = pts[(i+1) % pts.length];
+    const bothDead = (a.s === 'dead' || a.s === 'unreachable') && (b.s === 'dead' || b.s === 'unreachable');
+    svg += `<line x1="${a.x.toFixed(1)}" y1="${a.y.toFixed(1)}" x2="${b.x.toFixed(1)}" y2="${b.y.toFixed(1)}"
+      stroke="var(--border)" stroke-width="1" stroke-dasharray="${bothDead ? '3 3' : 'none'}"
+      opacity="${bothDead ? 0.3 : 0.7}"/>`;
+  }
+
+  // Node circles + key count + label
+  pts.forEach(p => {
+    svg += `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="10"
+      fill="${p.colorVar}" fill-opacity="${p.s === 'alive' ? 0.14 : 0.06}"
+      stroke="${p.colorVar}" stroke-width="1.5" opacity="${p.dim}"/>`;
+    if (p.keys !== '') {
+      svg += `<text x="${p.x.toFixed(1)}" y="${(p.y+3.5).toFixed(1)}"
+        text-anchor="middle" fill="${p.colorVar}" font-size="8"
+        font-family="monospace" opacity="${p.dim}">${p.keys}</text>`;
+    }
+    svg += `<text x="${p.lx.toFixed(1)}" y="${(p.ly+3).toFixed(1)}"
+      text-anchor="middle" fill="var(--muted)" font-size="9"
+      font-family="monospace">${p.shortId}</text>`;
+  });
+
+  return `<svg id="ring-svg" viewBox="0 0 192 192" xmlns="http://www.w3.org/2000/svg">${svg}</svg>`;
+}
+
+// ── Render ────────────────────────────────────────────────────
+function render(data) {
+  const nodes   = data.nodes   || [];
+  const summary = data.summary || {};
+
+  document.getElementById('alive-count').textContent = `${summary.alive ?? '?'}/${summary.total ?? nodes.length}`;
+  document.getElementById('total-keys').textContent  = summary.total_keys ?? '—';
+
+  // Detect gossip state changes
+  nodes.forEach(n => {
+    const id   = n.id || n.node_id;
+    const curr = n.status;
+    const prev = prevStates[id];
+    if (prev !== undefined && prev !== curr) pushEvent(id, prev, curr);
+    prevStates[id] = curr;
+    // Also watch peer_states from each node's perspective
+    if (n.peer_states) {
+      Object.entries(n.peer_states).forEach(([pid, pst]) => {
+        const key = `${id}→${pid}`;
+        if (prevStates[key] !== undefined && prevStates[key] !== pst)
+          pushEvent(`${id} sees ${pid}`, prevStates[key], pst);
+        prevStates[key] = pst;
+      });
+    }
+  });
+
+  const row = document.getElementById('top-row');
+
+  const cards = nodes.map(n => {
+    const id = n.id || n.node_id || '?';
+    const s  = sc(n.status);
+
+    if (n.status === 'unreachable') {
+      return `<div class="card">
+        <div class="card-hdr">
+          <span class="node-id">${id}</span>
+          <span class="badge"><span class="dot unreachable"></span><span class="badge-text unreachable">unreachable</span></span>
+        </div>
+        <div class="card-error">${n.error || 'no response'}</div>
+      </div>`;
+    }
+
+    const peers = n.peer_states
+      ? Object.entries(n.peer_states).map(([pid, pst]) =>
+          `<div class="peer-row">
+             <span class="peer-id-lbl">${pid}</span>
+             <span class="peer-pill ${sc(pst)}">${pst}</span>
+           </div>`).join('')
+      : '';
+
+    return `<div class="card">
+      <div class="card-hdr">
+        <span class="node-id">${id}</span>
+        <span class="badge"><span class="dot ${s}"></span><span class="badge-text ${s}">${n.status}</span></span>
+      </div>
+      <div class="card-body">
+        <div class="mrow">
+          <span class="mlbl">keys held</span>
+          <span class="mval big">${n.keys_held ?? '—'}</span>
+        </div>
+        ${n.uptime_seconds != null ? `<div class="mrow">
+          <span class="mlbl">uptime</span>
+          <span class="mval">${fmtUp(n.uptime_seconds)}</span>
+        </div>` : ''}
+        ${n.requests_total != null ? `<div class="mrow">
+          <span class="mlbl">requests</span>
+          <span class="mval">${n.requests_total.toLocaleString()}</span>
+        </div>` : ''}
+        ${peers ? `<hr class="divider"><div class="peer-list">${peers}</div>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+
+  const ring = `<div class="ring-panel">
+    <div class="ring-lbl">hash ring</div>
+    ${buildRing(nodes)}
+  </div>`;
+
+  row.innerHTML = cards + ring;
+}
+
+// ── Fetch loop ────────────────────────────────────────────────
+async function tick() {
+  if (busy) return;
+  busy = true;
+  const tsEl = document.getElementById('ts');
+  try {
+    const r = await fetch(`${API}/v1/cluster`, { cache: 'no-store' });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    render(await r.json());
+    tsEl.textContent = `updated ${hhmm()}`;
+    tsEl.className = 'ts';
+  } catch (e) {
+    tsEl.textContent = `error: ${e.message}`;
+    tsEl.className = 'ts error';
+  } finally {
+    busy = false;
+  }
+}
+
+async function triggerRebalance() {
+  const btn = document.getElementById('btn-rebalance');
+  btn.disabled = true;
+  btn.textContent = 'rebalancing…';
+  try {
+    const r   = await fetch(`${API}/v1/cluster/rebalance`, { method: 'POST', cache: 'no-store' });
+    const d   = await r.json();
+    const msg = Object.entries(d.results || {}).map(([id, v]) => `${id}: ${v}`).join(' · ');
+    showToast(msg || 'rebalance complete');
+    pushEvent('cluster', '', 'rebalance triggered');
+    await tick();
+  } catch (e) {
+    showToast(`error: ${e.message}`);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'rebalance';
+  }
+}
+
+function showToast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 3800);
+}
+
+// First load: seed prevStates silently, then log the connect event
+tick().then(() => {
+  const ids = Object.keys(prevStates).filter(k => !k.includes('→'));
+  if (ids.length) pushEvent('cluster', '', `connected · ${ids.length} nodes`);
+});
+
+setInterval(tick, 2000);
+</script>
+</body>
+</html>

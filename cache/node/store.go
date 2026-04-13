@@ -72,6 +72,20 @@ func (s *Store) Keys() int {
 	return len(s.data)
 }
 
+// All returns a snapshot of all live key→value pairs.
+func (s *Store) All() map[string]string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	now := time.Now()
+	out := make(map[string]string, len(s.data))
+	for k, e := range s.data {
+		if e.expiresAt.IsZero() || e.expiresAt.After(now) {
+			out[k] = e.value
+		}
+	}
+	return out
+}
+
 // background eviction: scan every 30s, delete expired keys
 func (s *Store) evictLoop() {
 	ticker := time.NewTicker(30 * time.Second)

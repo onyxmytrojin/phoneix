@@ -1,3 +1,4 @@
+import asyncio
 import json
 import os
 import statistics
@@ -6,6 +7,30 @@ from datetime import datetime, timezone, timedelta
 
 from fastapi import APIRouter, Response
 from app.middleware.logging import LOG_PATH
+
+# Cache node addresses — override via CACHE_NODES env var as comma-separated
+# host:tcp-port pairs: "localhost:6001,localhost:6002,localhost:6003"
+_raw = os.getenv("CACHE_NODES", "localhost:6001,localhost:6002,localhost:6003")
+_CACHE_NODES = [tuple(n.split(":")) for n in _raw.split(",") if ":" in n]
+_CACHE_NODE_IDS = os.getenv("CACHE_NODE_IDS", "node-a,node-b,node-c").split(",")
+
+
+async def _cache_cmd(host: str, port: str, command: str, timeout: float = 2.0) -> str:
+    try:
+        reader, writer = await asyncio.wait_for(
+            asyncio.open_connection(host, int(port)), timeout=timeout
+        )
+        writer.write(f"{command}\r\n".encode())
+        await writer.drain()
+        line = await asyncio.wait_for(reader.readline(), timeout=timeout)
+        writer.close()
+        try:
+            await writer.wait_closed()
+        except Exception:
+            pass
+        return line.decode().strip()
+    except Exception as e:
+        return f"ERR {e}"
 
 router = APIRouter()
 
@@ -159,3 +184,39 @@ async def logs(response: Response):
     response.headers["Cache-Control"] = "no-store"
     entries = _read_logs(1)
     return {"logs": entries[-50:]}
+
+
+@router.get("/cluster")
+async def cluster_status(response: Response):
+    response.headers["Cache-Control"] = "no-store"
+    tasks = [_cache_cmd(h, p, "INFO") for h, p in _CACHE_NODES]
+    raw = await asyncio.gather(*tasks)
+
+    nodes = []
+    for i, text in enumerate(raw):
+        node_id = _CACHE_NODE_IDS[i] if i < len(_CACHE_NODE_IDS) else f"node-{i}"
+        if text.startswith("ERR"):
+            nodes.append({"id": node_id, "status": "unreachable", "error": text})
+            continue
+        try:
+            info = json.loads(text)
+            info["status"] = "alive"
+            nodes.append(info)
+        except Exception:
+            nodes.append({"id": node_id, "status": "unreachable", "error": text})
+
+    total_keys = sum(n.get("keys_held", 0) for n in nodes if n.get("status") == "alive")
+    alive = sum(1 for n in nodes if n.get("status") == "alive")
+    return {"nodes": nodes, "summary": {"alive": alive, "total": len(nodes), "total_keys": total_keys}}
+
+
+@router.post("/cluster/rebalance")
+async def cluster_rebalance(response: Response):
+    response.headers["Cache-Control"] = "no-store"
+    tasks = [_cache_cmd(h, p, "MIGRATE") for h, p in _CACHE_NODES]
+    raw = await asyncio.gather(*tasks)
+    results = {}
+    for i, text in enumerate(raw):
+        node_id = _CACHE_NODE_IDS[i] if i < len(_CACHE_NODE_IDS) else f"node-{i}"
+        results[node_id] = text
+    return {"results": results}
