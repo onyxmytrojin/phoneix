@@ -7,8 +7,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="style.css?v=6" />
-  <link rel="stylesheet" href="server.css?v=6" />
+  <link rel="stylesheet" href="style.css?v=7" />
+  <link rel="stylesheet" href="server.css?v=7" />
 </head>
 <body class="srv-body">
 
@@ -108,6 +108,17 @@
     </div>
   </div>
 
+  <!-- Cache Cluster -->
+  <div class="srv-panel srv-panel-full">
+    <div class="srv-panel-hd">
+      <span class="srv-panel-title">Cache Cluster</span>
+      <a href="cluster.html" class="srv-docs-link">Full view ↗</a>
+    </div>
+    <div id="srv-cache-cluster">
+      <div class="srv-loading">Loading…</div>
+    </div>
+  </div>
+
   <!-- Live Request Feed -->
   <div class="srv-panel srv-panel-full">
     <div class="srv-panel-hd">
@@ -141,6 +152,16 @@
         <div class="api-output" id="out-health" style="display:none"></div>
         <div class="api-row" data-path="/v1/now"><span class="api-badge">GET</span><code class="api-path">/v1/now</code><span class="srv-api-desc">Currently building</span><button class="api-btn">Try</button></div>
         <div class="api-output" id="out-now" style="display:none"></div>
+      </div>
+    </div>
+
+    <div class="srv-api-group">
+      <div class="srv-api-group-label">Cache</div>
+      <div class="api-explorer">
+        <div class="api-row" data-path="/v1/cluster"><span class="api-badge">GET</span><code class="api-path">/v1/cluster</code><span class="srv-api-desc">Cache cluster status</span><button class="api-btn">Try</button></div>
+        <div class="api-output" id="out-cluster" style="display:none"></div>
+        <div class="api-row" data-path="/v1/cluster/rebalance" data-method="POST"><span class="api-badge api-badge-post">POST</span><code class="api-path">/v1/cluster/rebalance</code><span class="srv-api-desc">Trigger key rebalancing</span><button class="api-btn">Try</button></div>
+        <div class="api-output" id="out-cluster/rebalance" style="display:none"></div>
       </div>
     </div>
 
@@ -187,6 +208,6 @@
   </div>
 </footer>
 
-<script src="server.js?v=6"></script>
+<script src="server.js?v=7"></script>
 </body>
 </html>

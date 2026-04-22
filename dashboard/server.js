@@ -189,6 +189,64 @@ async function updateFeed() {
   }).join('');
 }
 
+// ── Cache Cluster ──────────────────────────────────────────────────────────
+
+async function updateCacheCluster() {
+  const el = document.getElementById('srv-cache-cluster');
+  if (!el) return;
+  const d = await apiFetch('/v1/cluster');
+  if (!d || !d.nodes) {
+    el.innerHTML = '<div class="srv-loading">Cache cluster unavailable</div>';
+    return;
+  }
+
+  const summary = d.summary || {};
+  const nodes   = d.nodes  || [];
+  const alive   = summary.alive ?? 0;
+  const total   = summary.total ?? nodes.length;
+  const allGood = alive === total;
+
+  const nodeChips = nodes.map(n => {
+    const id  = n.node_id || n.id || '?';
+    const st  = n.status  || 'unreachable';
+    const sc  = st === 'alive' ? 'ok' : st === 'suspect' ? 'warn' : 'err';
+    const peers = n.peer_states
+      ? Object.entries(n.peer_states).map(([pid, pst]) => {
+          const pc = pst === 'alive' ? 'ok' : pst === 'suspect' ? 'warn' : 'err';
+          return `<span class="cache-peer-dot cache-dot-${pc}" title="${pid}: ${pst}"></span>`;
+        }).join('')
+      : '';
+    return `
+      <div class="cache-node-card">
+        <div class="cache-node-top">
+          <span class="cache-dot cache-dot-${sc}"></span>
+          <span class="cache-node-id">${id}</span>
+        </div>
+        <div class="cache-node-keys">${n.keys_held ?? '—'}</div>
+        <div class="cache-node-label">keys</div>
+        ${n.uptime_seconds != null ? `<div class="cache-node-uptime">${fmtUp(n.uptime_seconds)}</div>` : ''}
+        <div class="cache-peers-row">${peers}</div>
+      </div>`;
+  }).join('');
+
+  el.innerHTML = `
+    <div class="cache-cluster-wrap">
+      <div class="cache-summary-row">
+        <span class="cache-summary-stat ${allGood ? 'good' : 'warn'}">${alive}/${total} nodes alive</span>
+        <span class="cache-summary-stat">${summary.total_keys ?? 0} keys cached</span>
+        <span class="cache-summary-stat">3-node consistent hash ring</span>
+      </div>
+      <div class="cache-nodes-row">${nodeChips}</div>
+    </div>`;
+}
+
+function fmtUp(s) {
+  if (!s && s !== 0) return '—';
+  if (s < 60)   return `${s}s`;
+  if (s < 3600) return `${Math.floor(s / 60)}m`;
+  return `${Math.floor(s / 3600)}h ${Math.floor((s % 3600) / 60)}m`;
+}
+
 // ── API Explorer ───────────────────────────────────────────────────────────
 
 function initApiExplorer() {
@@ -205,9 +263,12 @@ function initApiExplorer() {
       btn.textContent = '…';
       btn.disabled = true;
       output.style.display = 'block';
-      output.textContent = `// GET ${API_BASE}${path}`;
+      const method = row.dataset.method ?? 'GET';
+      output.textContent = `// ${method} ${API_BASE}${path}`;
 
-      const data = await apiFetch(path, { timeout: 12000, format: fmt });
+      const data = method === 'POST'
+        ? await fetch(`${API_BASE}${path}`, { method: 'POST' }).then(r => r.json()).catch(() => null)
+        : await apiFetch(path, { timeout: 12000, format: fmt });
       if (data !== null) {
         output.textContent = fmt === 'text'
           ? String(data)
@@ -238,10 +299,12 @@ document.addEventListener('DOMContentLoaded', () => {
   updateAvailability();
   updateResponseTimes();
   updateFeed();
+  updateCacheCluster();
 
-  setInterval(updateStats,         5000);
-  setInterval(updateFeed,          5000);
-  setInterval(updateStatusPill,   30000);
-  setInterval(updateResponseTimes, 60000);
-  setInterval(updateAvailability, 300000);
+  setInterval(updateStats,          5000);
+  setInterval(updateFeed,           5000);
+  setInterval(updateCacheCluster,  10000);
+  setInterval(updateStatusPill,    30000);
+  setInterval(updateResponseTimes,  60000);
+  setInterval(updateAvailability,  300000);
 });
