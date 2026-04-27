@@ -389,7 +389,9 @@ html,body {
 <div class="toast" id="toast"></div>
 
 <script>
-const API = window.location.origin;
+const API = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+  ? 'http://localhost:8000'
+  : 'https://api.shubhanmehrotra.com';
 let prevStates = {};
 let events     = [];
 let busy       = false;
@@ -530,9 +532,10 @@ function render(data) {
            </div>`).join('')
       : '';
 
+    const portStr = n.port ? `:${n.port}` : '';
     return `<div class="card">
       <div class="card-hdr">
-        <span class="node-id">${id}</span>
+        <span class="node-id">${id}<span style="color:var(--muted);font-weight:400">${portStr}</span></span>
         <span class="badge"><span class="dot ${s}"></span><span class="badge-text ${s}">${n.status}</span></span>
       </div>
       <div class="card-body">
@@ -547,6 +550,10 @@ function render(data) {
         ${n.requests_total != null ? `<div class="mrow">
           <span class="mlbl">requests</span>
           <span class="mval">${n.requests_total.toLocaleString()}</span>
+        </div>` : ''}
+        ${n.requests_total != null && n.uptime_seconds ? `<div class="mrow">
+          <span class="mlbl">req/min</span>
+          <span class="mval">${n.uptime_seconds > 0 ? ((n.requests_total / n.uptime_seconds) * 60).toFixed(1) : '—'}</span>
         </div>` : ''}
         ${peers ? `<hr class="divider"><div class="peer-list">${peers}</div>` : ''}
       </div>

@@ -163,6 +163,9 @@ async function updateResponseTimes() {
 
 // ── Live feed ──────────────────────────────────────────────────────────────
 
+const DASHBOARD_PATHS = new Set(['/v1/server','/v1/logs','/v1/cluster','/v1/ping',
+  '/v1/response-times','/v1/availability','/v1/visitors']);
+
 async function updateFeed() {
   const d = await apiFetch('/v1/logs');
   const el = document.getElementById('srv-feed');
@@ -170,16 +173,24 @@ async function updateFeed() {
   const logs = d?.logs;
   if (!logs || logs.length === 0) return;
 
-  const rows = [...logs].reverse().slice(0, 25);
-  el.innerHTML = rows.map(r => {
+  // Split into external (real visitors) and dashboard's own polling
+  const external = logs.filter(r => !DASHBOARD_PATHS.has(r.path));
+  const all      = [...logs].reverse().slice(0, 25);
+
+  const note = external.length > 0
+    ? ''
+    : '<div class="srv-feed-note">Dashboard polling shown — no external requests yet</div>';
+
+  const rows = all.map(r => {
     const method = (r.method ?? 'GET').toUpperCase();
     const mClass = method === 'GET' ? 'get' : method === 'POST' ? 'post' : 'other';
     const s = r.status ?? 0;
     const sClass = s < 400 ? 'ok' : s < 500 ? 'warn' : 'err';
     const ms = r.duration_ms != null ? `${r.duration_ms.toFixed(0)}ms` : '—';
     const when = r.timestamp ? timeAgo(r.timestamp) : '—';
+    const isDash = DASHBOARD_PATHS.has(r.path);
     return `
-      <div class="srv-feed-row">
+      <div class="srv-feed-row${isDash ? ' feed-row-dim' : ''}">
         <span class="feed-method feed-method-${mClass}">${method}</span>
         <code class="feed-path">${r.path ?? '—'}</code>
         <span class="feed-status feed-${sClass}">${s}</span>
@@ -187,6 +198,7 @@ async function updateFeed() {
         <span class="feed-when">${when}</span>
       </div>`;
   }).join('');
+  el.innerHTML = note + rows;
 }
 
 // ── Cache Cluster ──────────────────────────────────────────────────────────
@@ -210,22 +222,31 @@ async function updateCacheCluster() {
     const id  = n.node_id || n.id || '?';
     const st  = n.status  || 'unreachable';
     const sc  = st === 'alive' ? 'ok' : st === 'suspect' ? 'warn' : 'err';
-    const peers = n.peer_states
+    const port = n.port ? `:${n.port}` : '';
+    const reqs = n.requests_total != null ? n.requests_total.toLocaleString() : null;
+    const rps  = (n.requests_total != null && n.uptime_seconds > 0)
+      ? ((n.requests_total / n.uptime_seconds) * 60).toFixed(1)
+      : null;
+    const peerRows = n.peer_states
       ? Object.entries(n.peer_states).map(([pid, pst]) => {
           const pc = pst === 'alive' ? 'ok' : pst === 'suspect' ? 'warn' : 'err';
-          return `<span class="cache-peer-dot cache-dot-${pc}" title="${pid}: ${pst}"></span>`;
+          return `<div class="cache-peer-row"><span class="cache-dot cache-dot-${pc}"></span><span class="cache-peer-id">${pid}</span><span class="cache-peer-st cache-st-${pc}">${pst}</span></div>`;
         }).join('')
       : '';
     return `
       <div class="cache-node-card">
         <div class="cache-node-top">
           <span class="cache-dot cache-dot-${sc}"></span>
-          <span class="cache-node-id">${id}</span>
+          <span class="cache-node-id">${id}<span class="cache-node-port">${port}</span></span>
         </div>
         <div class="cache-node-keys">${n.keys_held ?? '—'}</div>
-        <div class="cache-node-label">keys</div>
-        ${n.uptime_seconds != null ? `<div class="cache-node-uptime">${fmtUp(n.uptime_seconds)}</div>` : ''}
-        <div class="cache-peers-row">${peers}</div>
+        <div class="cache-node-label">keys cached</div>
+        <div class="cache-node-meta">
+          ${n.uptime_seconds != null ? `<span>up ${fmtUp(n.uptime_seconds)}</span>` : ''}
+          ${reqs != null ? `<span>${reqs} reqs</span>` : ''}
+          ${rps != null ? `<span>${rps}/min</span>` : ''}
+        </div>
+        ${peerRows ? `<div class="cache-peer-list">${peerRows}</div>` : ''}
       </div>`;
   }).join('');
 
@@ -257,6 +278,15 @@ function initApiExplorer() {
     const key = path.replace('/v1/', '');
     const output = document.getElementById(`out-${key}`);
     if (!btn || !output) return;
+
+    // Clicking the row (not the button) toggles the output panel
+    row.addEventListener('click', e => {
+      if (e.target === btn || btn.contains(e.target)) return;
+      if (output.style.display !== 'none') {
+        output.style.display = 'none';
+      }
+    });
+    row.style.cursor = 'pointer';
 
     btn.addEventListener('click', async e => {
       e.stopPropagation();
