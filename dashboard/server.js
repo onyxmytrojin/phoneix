@@ -279,12 +279,10 @@ function initApiExplorer() {
     const output = document.getElementById(`out-${key}`);
     if (!btn || !output) return;
 
-    // Clicking the row (not the button) toggles the output panel
+    // Clicking anywhere in the row except Try collapses the output
     row.addEventListener('click', e => {
-      if (e.target === btn || btn.contains(e.target)) return;
-      if (output.style.display !== 'none') {
-        output.style.display = 'none';
-      }
+      if (e.target.closest('.api-btn')) return;
+      output.style.display = 'none';
     });
     row.style.cursor = 'pointer';
 
