@@ -2,12 +2,13 @@ package node
 
 import (
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
 type entry struct {
 	value     string
-	expiresAt time.Time // zero = no expiry
+	expiresAt time.Time
 }
 
 func (e *entry) expired() bool {
@@ -15,8 +16,10 @@ func (e *entry) expired() bool {
 }
 
 type Store struct {
-	mu   sync.RWMutex
-	data map[string]*entry
+	mu     sync.RWMutex
+	data   map[string]*entry
+	hits   atomic.Int64
+	misses atomic.Int64
 }
 
 func NewStore() *Store {
@@ -40,8 +43,10 @@ func (s *Store) Get(key string) (string, bool) {
 	e, ok := s.data[key]
 	s.mu.RUnlock()
 	if !ok || e.expired() {
+		s.misses.Add(1)
 		return "", false
 	}
+	s.hits.Add(1)
 	return e.value, true
 }
 
@@ -58,10 +63,10 @@ func (s *Store) TTL(key string) int64 {
 	e, ok := s.data[key]
 	s.mu.RUnlock()
 	if !ok || e.expired() {
-		return -2 // MISS
+		return -2
 	}
 	if e.expiresAt.IsZero() {
-		return -1 // no TTL
+		return -1
 	}
 	return int64(time.Until(e.expiresAt).Seconds())
 }
@@ -71,6 +76,9 @@ func (s *Store) Keys() int {
 	defer s.mu.RUnlock()
 	return len(s.data)
 }
+
+func (s *Store) Hits() int64   { return s.hits.Load() }
+func (s *Store) Misses() int64 { return s.misses.Load() }
 
 // All returns a snapshot of all live key→value pairs.
 func (s *Store) All() map[string]string {
@@ -86,7 +94,22 @@ func (s *Store) All() map[string]string {
 	return out
 }
 
-// background eviction: scan every 30s, delete expired keys
+// AllWithTTL returns a snapshot of live key → remaining TTL seconds. -1 = no TTL.
+func (s *Store) AllWithTTL() map[string]int64 {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	now := time.Now()
+	out := make(map[string]int64, len(s.data))
+	for k, e := range s.data {
+		if e.expiresAt.IsZero() {
+			out[k] = -1
+		} else if e.expiresAt.After(now) {
+			out[k] = int64(e.expiresAt.Sub(now).Seconds())
+		}
+	}
+	return out
+}
+
 func (s *Store) evictLoop() {
 	ticker := time.NewTicker(30 * time.Second)
 	for range ticker.C {

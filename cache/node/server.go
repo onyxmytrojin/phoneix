@@ -5,13 +5,43 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
+	"runtime"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/onyxmytrojin/phoneix/cache/cluster"
 	"github.com/onyxmytrojin/phoneix/cache/config"
 )
+
+// cmdLog is a fixed-size ring buffer of recent user-facing commands.
+type cmdLog struct {
+	mu      sync.Mutex
+	entries []string
+}
+
+const maxCmdLog = 8
+
+func (l *cmdLog) add(s string) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.entries = append(l.entries, s)
+	if len(l.entries) > maxCmdLog {
+		l.entries = l.entries[len(l.entries)-maxCmdLog:]
+	}
+}
+
+func (l *cmdLog) recent() []string {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if len(l.entries) == 0 {
+		return nil
+	}
+	out := make([]string, len(l.entries))
+	copy(out, l.entries)
+	return out
+}
 
 type Server struct {
 	nodeID    string
@@ -21,6 +51,7 @@ type Server struct {
 	gossip    *cluster.Gossip
 	startedAt time.Time
 	requests  uint64
+	cmdLog    *cmdLog
 }
 
 func NewServer(cfg *config.Config) *Server {
@@ -34,6 +65,7 @@ func NewServer(cfg *config.Config) *Server {
 		store:     NewStore(),
 		router:    router,
 		startedAt: time.Now(),
+		cmdLog:    &cmdLog{},
 	}
 	if len(cfg.Peers) > 0 {
 		s.gossip = cluster.NewGossip(cfg.NodeID, router)
@@ -78,15 +110,23 @@ func (s *Server) dispatch(line string) string {
 	}
 	cmd := strings.ToUpper(parts[0])
 
+	// Log user-facing commands (skip gossip/internal noise)
+	switch cmd {
+	case "SET", "GET", "DEL", "TTL", "KEYS", "KEYSTTL", "MIGRATE", "CLUSTER":
+		entry := line
+		if len(entry) > 48 {
+			entry = entry[:48] + "…"
+		}
+		s.cmdLog.add(entry)
+	}
+
 	switch cmd {
 	case "PING":
 		return "PONG " + s.nodeID
 
 	// ── Internal replication commands ────────────────────────────────────────
-	// These bypass the ring — replicas receive them directly from the primary.
 
 	case "LOCALSET":
-		// LOCALSET key value [ttl_seconds]
 		if len(parts) < 3 {
 			return "ERR LOCALSET key value [ttl]"
 		}
@@ -100,7 +140,6 @@ func (s *Server) dispatch(line string) string {
 		return "OK"
 
 	case "LOCALGET":
-		// LOCALGET key — read from this node's store directly, no routing
 		if len(parts) < 2 {
 			return "ERR LOCALGET key"
 		}
@@ -136,7 +175,7 @@ func (s *Server) dispatch(line string) string {
 			ttl = time.Duration(secs) * time.Second
 		}
 		s.store.Set(key, parts[2], ttl)
-		go s.replicate(key, parts[2], ttl, false) // async replica write
+		go s.replicate(key, parts[2], ttl, false)
 		return "OK"
 
 	case "GET":
@@ -150,14 +189,11 @@ func (s *Server) dispatch(line string) string {
 			if ok {
 				return v
 			}
-			// We became the owner after a topology change but don't hold a copy.
-			// Ask all live peers — one of them has the original replica.
 			if v, ok := s.readFromAnyPeer(key); ok {
 				return v
 			}
 			return "MISS"
 		}
-		// Forward to primary; on failure fan out to all peers.
 		resp, err := s.router.Forward(owner, line)
 		if err != nil {
 			if v, ok := s.readFromAnyPeer(key); ok {
@@ -176,7 +212,7 @@ func (s *Server) dispatch(line string) string {
 			return s.forward(owner, line)
 		}
 		existed := s.store.Del(key)
-		go s.replicate(key, "", 0, true) // async replica delete
+		go s.replicate(key, "", 0, true)
 		if existed {
 			return "OK"
 		}
@@ -196,7 +232,24 @@ func (s *Server) dispatch(line string) string {
 		}
 		return strconv.FormatInt(t, 10)
 
+	case "KEYSTTL":
+		// Returns JSON map of key → remaining TTL seconds for all local keys.
+		all := s.store.AllWithTTL()
+		b, _ := json.Marshal(all)
+		return string(b)
+
 	case "INFO":
+		hits := s.store.Hits()
+		misses := s.store.Misses()
+		total := hits + misses
+		var hitRate float64
+		if total > 0 {
+			hitRate = float64(hits) / float64(total) * 100
+		}
+
+		var ms runtime.MemStats
+		runtime.ReadMemStats(&ms)
+
 		uptime := int64(time.Since(s.startedAt).Seconds())
 		info := map[string]any{
 			"node_id":        s.nodeID,
@@ -204,6 +257,11 @@ func (s *Server) dispatch(line string) string {
 			"keys_held":      s.store.Keys(),
 			"uptime_seconds": uptime,
 			"requests_total": s.requests,
+			"hits":           hits,
+			"misses":         misses,
+			"hit_rate":       hitRate,
+			"memory_bytes":   ms.Alloc,
+			"recent_cmds":    s.cmdLog.recent(),
 		}
 		if s.gossip != nil {
 			peerInfos := s.gossip.Peers()
@@ -276,9 +334,6 @@ func (s *Server) forward(nodeID, command string) string {
 	return resp
 }
 
-// migrate walks the local store and forwards any key whose ring-owner is not
-// this node. Called on startup, on MIGRATE command, and after a peer recovers.
-// Returns the number of keys moved out.
 func (s *Server) migrate() int {
 	all := s.store.All()
 	moved := 0
@@ -305,8 +360,6 @@ func (s *Server) migrate() int {
 	return moved
 }
 
-// migrateToRecoveredNode pushes keys that now belong to recoveredID.
-// Called by gossip.OnRecovery after the recovered peer is added back to the ring.
 func (s *Server) migrateToRecoveredNode(recoveredID string) {
 	all := s.store.All()
 	moved := 0

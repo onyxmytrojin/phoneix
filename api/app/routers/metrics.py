@@ -210,6 +210,25 @@ async def cluster_status(response: Response):
     return {"nodes": nodes, "summary": {"alive": alive, "total": len(nodes), "total_keys": total_keys}}
 
 
+@router.get("/cluster/keys")
+async def cluster_keys(response: Response):
+    response.headers["Cache-Control"] = "no-store"
+    tasks = [_cache_cmd(h, p, "KEYSTTL") for h, p in _CACHE_NODES]
+    raw = await asyncio.gather(*tasks)
+    keys = []
+    for i, text in enumerate(raw):
+        node_id = _CACHE_NODE_IDS[i] if i < len(_CACHE_NODE_IDS) else f"node-{i}"
+        if text.startswith("ERR"):
+            continue
+        try:
+            node_keys = json.loads(text)
+            for key, ttl in node_keys.items():
+                keys.append({"key": key, "node_id": node_id, "ttl_seconds": int(ttl)})
+        except Exception:
+            continue
+    return {"keys": keys}
+
+
 @router.post("/cluster/rebalance")
 async def cluster_rebalance(response: Response):
     response.headers["Cache-Control"] = "no-store"
