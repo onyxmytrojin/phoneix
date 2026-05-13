@@ -112,7 +112,7 @@ func (s *Server) dispatch(line string) string {
 
 	// Log user-facing commands (skip gossip/internal noise)
 	switch cmd {
-	case "SET", "GET", "DEL", "TTL", "KEYS", "KEYSTTL", "MIGRATE", "CLUSTER":
+	case "SET", "GET", "DEL", "MIGRATE":
 		entry := line
 		if len(entry) > 48 {
 			entry = entry[:48] + "…"
