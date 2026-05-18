@@ -462,8 +462,8 @@ function render(data) {
     const hrClass = hitRate === null ? '' : hitRate > 80 ? 'hit-rate-good' : hitRate > 50 ? 'hit-rate-ok' : 'hit-rate-poor';
     const hrColor = hitRate === null ? 'var(--alive)' : hitRate > 80 ? 'var(--alive)' : hitRate > 50 ? 'var(--suspect)' : 'var(--dead)';
 
-    // Sparkline
-    recordHistory(id, n.requests_total || 0);
+    // Sparkline — use user_ops (GET/SET/DEL only) so gossip pings don't drown it out
+    recordHistory(id, n.user_ops != null ? n.user_ops : (n.requests_total || 0));
     const spark = sparklineSVG(id);
 
     // Recent commands
@@ -483,9 +483,13 @@ function render(data) {
           <span class="mlbl">uptime</span>
           <span class="mval">${fmtUp(n.uptime_seconds)}</span>
         </div>` : ''}
+        ${n.user_ops != null ? `<div class="mrow">
+          <span class="mlbl">user ops</span>
+          <span class="mval">${n.user_ops.toLocaleString()}</span>
+        </div>` : ''}
         ${n.requests_total != null ? `<div class="mrow">
-          <span class="mlbl">requests</span>
-          <span class="mval">${n.requests_total.toLocaleString()}</span>
+          <span class="mlbl" style="font-size:9px">gossip + internal</span>
+          <span class="mval" style="font-size:10px;color:var(--muted)">${n.requests_total.toLocaleString()}</span>
         </div>` : ''}
         ${n.memory_bytes ? `<div class="mrow">
           <span class="mlbl">memory</span>

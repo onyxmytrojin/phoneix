@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/onyxmytrojin/phoneix/cache/cluster"
@@ -51,6 +52,7 @@ type Server struct {
 	gossip    *cluster.Gossip
 	startedAt time.Time
 	requests  uint64
+	userOps   atomic.Uint64 // GET + SET + DEL only
 	cmdLog    *cmdLog
 }
 
@@ -159,6 +161,7 @@ func (s *Server) dispatch(line string) string {
 	// ── Client-facing commands ────────────────────────────────────────────────
 
 	case "SET":
+		s.userOps.Add(1)
 		if len(parts) < 3 {
 			return "ERR SET key value [ttl]"
 		}
@@ -179,6 +182,7 @@ func (s *Server) dispatch(line string) string {
 		return "OK"
 
 	case "GET":
+		s.userOps.Add(1)
 		if len(parts) < 2 {
 			return "ERR GET key"
 		}
@@ -204,6 +208,7 @@ func (s *Server) dispatch(line string) string {
 		return resp
 
 	case "DEL":
+		s.userOps.Add(1)
 		if len(parts) < 2 {
 			return "ERR DEL key"
 		}
@@ -257,6 +262,7 @@ func (s *Server) dispatch(line string) string {
 			"keys_held":      s.store.Keys(),
 			"uptime_seconds": uptime,
 			"requests_total": s.requests,
+			"user_ops":       s.userOps.Load(),
 			"hits":           hits,
 			"misses":         misses,
 			"hit_rate":       hitRate,

@@ -10,8 +10,8 @@ import (
 )
 
 const (
-	heartbeatInterval = 500 * time.Millisecond
-	deadAfter         = 3 // missed heartbeats before marking dead
+	heartbeatInterval = 2000 * time.Millisecond // 4× less traffic; still detects failures in ~6s
+	deadAfter         = 3                        // missed heartbeats before marking dead
 )
 
 type NodeStatus int
