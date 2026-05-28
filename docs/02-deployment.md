@@ -6,19 +6,21 @@ How to get code from this laptop onto the Pixel 7a.
 
 ## SSH Access
 
-Phone is reachable at: `192.168.68.115` (check current IP if it changes)  
+Phone is reachable at: `192.168.68.104` (check current IP if it changes — DHCP)  
 SSH key: `~/.ssh/pixel_server`  
 User: `root`  
 Port: `22` (dropbear, running inside Debian proot)
 
 ```bash
 # Test connection
-ssh -i ~/.ssh/pixel_server -p 22 root@192.168.68.115
+ssh -i ~/.ssh/pixel_server -p 22 root@192.168.68.104
 ```
 
 ---
 
 ## How Deployment Works
+
+### API (FastAPI)
 
 Everything is managed through git. No SCP needed.
 
@@ -35,6 +37,31 @@ phoneix deploy
 ```
 
 `phoneix deploy` runs `git pull` then `supervisorctl restart phoneix` then shows status.
+
+---
+
+### Frontend (Next.js static export)
+
+The web dashboard (`web/`) is built locally and SCP'd to the phone. It is **not** deployed via git pull — the `out/` build directory is gitignored.
+
+```bash
+# Build static export
+cd web
+npm run build          # outputs to web/out/
+
+# Deploy to phone
+ssh -i ~/.ssh/pixel_server root@192.168.68.104 "rm -rf /var/www/phoneix/dashboard/*"
+scp -i ~/.ssh/pixel_server -r web/out/. root@192.168.68.104:/var/www/phoneix/dashboard/
+ssh -i ~/.ssh/pixel_server root@192.168.68.104 "nginx -s reload"
+```
+
+Nginx serves `/var/www/phoneix/dashboard/` for `shubhanmehrotra.com`. The config uses:
+
+```nginx
+try_files $uri $uri/index.html $uri.html =404;
+```
+
+Note: `$uri/` (without `index.html`) must **not** be used — Next.js export creates route directories like `server/` and `cluster/` with no `index.html`, causing nginx to return 403 instead of serving the `.html` file.
 
 ---
 

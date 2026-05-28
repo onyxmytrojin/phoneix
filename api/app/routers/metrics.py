@@ -1,11 +1,12 @@
 import asyncio
+import asyncio.subprocess as asp
 import json
 import os
 import statistics
 from collections import defaultdict
 from datetime import datetime, timezone, timedelta
 
-from fastapi import APIRouter, Response
+from fastapi import APIRouter, Response, HTTPException, Request
 from app.middleware.logging import LOG_PATH
 
 # Cache node addresses — override via CACHE_NODES env var as comma-separated
@@ -128,17 +129,18 @@ async def availability(response: Response):
 
     today = datetime.now(timezone.utc).date()
     days = []
-    for i in range(29, -1, -1):
+    for i in range(89, -1, -1):
         day = (today - timedelta(days=i)).isoformat()
         statuses = by_day.get(day, [])
         if not statuses:
             pct = 100.0
             status = "no_data"
+            errors_count = 0
         else:
-            errors = sum(1 for s in statuses if s >= 500)
-            pct = round((1 - errors / len(statuses)) * 100, 1)
+            errors_count = sum(1 for s in statuses if s >= 500)
+            pct = round((1 - errors_count / len(statuses)) * 100, 1)
             status = "healthy" if pct == 100 else "degraded" if pct >= 95 else "incident"
-        days.append({"date": day, "uptime_percent": pct, "status": status, "requests": len(statuses)})
+        days.append({"date": day, "uptime_percent": pct, "status": status, "requests": len(statuses), "errors": errors_count})
 
     all_pcts = [d["uptime_percent"] for d in days if d["status"] != "no_data"]
     avg = round(sum(all_pcts) / len(all_pcts), 2) if all_pcts else 100.0
@@ -146,7 +148,7 @@ async def availability(response: Response):
     return {
         "days": days,
         "summary": {
-            "last_30_days": avg,
+            "last_90_days": avg,
             "today": days[-1]["uptime_percent"] if days else 100.0,
         }
     }
@@ -189,8 +191,11 @@ async def logs(response: Response):
 @router.get("/cluster")
 async def cluster_status(response: Response):
     response.headers["Cache-Control"] = "no-store"
-    tasks = [_cache_cmd(h, p, "INFO") for h, p in _CACHE_NODES]
-    raw = await asyncio.gather(*tasks)
+    info_tasks = [_cache_cmd(h, p, "INFO") for h, p in _CACHE_NODES]
+    # Fetch ring ownership from the first node in parallel with INFO calls
+    ring_task = _cache_cmd(_CACHE_NODES[0][0], _CACHE_NODES[0][1], "CLUSTER RING")
+    results = await asyncio.gather(*info_tasks, ring_task)
+    raw, ring_raw = results[:-1], results[-1]
 
     nodes = []
     for i, text in enumerate(raw):
@@ -205,15 +210,25 @@ async def cluster_status(response: Response):
         except Exception:
             nodes.append({"id": node_id, "status": "unreachable", "error": text})
 
+    ring_ownership: dict = {}
+    try:
+        ring_ownership = json.loads(ring_raw).get("ownership") or {}
+    except Exception:
+        pass
+
     total_keys = sum(n.get("keys_held", 0) for n in nodes if n.get("status") == "alive")
     alive = sum(1 for n in nodes if n.get("status") == "alive")
-    return {"nodes": nodes, "summary": {"alive": alive, "total": len(nodes), "total_keys": total_keys}}
+    return {
+        "nodes": nodes,
+        "summary": {"alive": alive, "total": len(nodes), "total_keys": total_keys},
+        "ring": {"ownership": ring_ownership},
+    }
 
 
 @router.get("/cluster/keys")
 async def cluster_keys(response: Response):
     response.headers["Cache-Control"] = "no-store"
-    tasks = [_cache_cmd(h, p, "KEYSTTL") for h, p in _CACHE_NODES]
+    tasks = [_cache_cmd(h, p, "KEYSTATS") for h, p in _CACHE_NODES]
     raw = await asyncio.gather(*tasks)
     keys = []
     for i, text in enumerate(raw):
@@ -222,11 +237,54 @@ async def cluster_keys(response: Response):
             continue
         try:
             node_keys = json.loads(text)
-            for key, ttl in node_keys.items():
-                keys.append({"key": key, "node_id": node_id, "ttl_seconds": int(ttl)})
+            for key, stat in node_keys.items():
+                keys.append({
+                    "key": key,
+                    "node_id": node_id,
+                    "ttl_seconds": int(stat.get("ttl", -1)),
+                    "hits": int(stat.get("hits", 0)),
+                })
         except Exception:
             continue
     return {"keys": keys}
+
+
+@router.get("/cluster/key/{key_name:path}")
+async def get_key_value(key_name: str, response: Response):
+    """Fetch the raw value of a single key (any node will route it correctly)."""
+    response.headers["Cache-Control"] = "no-store"
+    h, p = _CACHE_NODES[0]
+    text = await _cache_cmd(h, p, f"GET {key_name}")
+    if text and not text.startswith("ERR") and text != "MISS":
+        return {"key": key_name, "value": text}
+    return {"key": key_name, "value": None}
+
+
+@router.post("/cluster/chaos")
+async def cluster_chaos(request: Request, response: Response):
+    response.headers["Cache-Control"] = "no-store"
+    body = await request.json()
+    node_id = body.get("node_id", "")
+    action = body.get("action", "")
+
+    if node_id not in _CACHE_NODE_IDS:
+        raise HTTPException(status_code=400, detail=f"unknown node_id: {node_id!r}")
+    if action not in ("stop", "start"):
+        raise HTTPException(status_code=400, detail="action must be 'stop' or 'start'")
+
+    prog = f"cache-{node_id}"  # "node-a" → "cache-node-a"
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            "supervisorctl", action, prog,
+            stdout=asp.PIPE, stderr=asp.PIPE,
+        )
+        stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=5.0)
+        output = (stdout + stderr).decode().strip()
+        return {"ok": proc.returncode == 0, "output": output, "node_id": node_id, "action": action}
+    except asyncio.TimeoutError:
+        return {"ok": False, "output": "supervisorctl timed out", "node_id": node_id, "action": action}
+    except Exception as exc:
+        return {"ok": False, "output": str(exc), "node_id": node_id, "action": action}
 
 
 @router.post("/cluster/rebalance")

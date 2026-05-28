@@ -1,36 +1,34 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# phoneix web
 
-## Getting Started
+Next.js 15 portfolio and live dashboard for [shubhanmehrotra.com](https://shubhanmehrotra.com).
 
-First, run the development server:
+## Pages
+
+| Route | Description |
+|-------|-------------|
+| `/` | Portfolio — hero, projects, skills, experience, contact |
+| `/server` | Live server stats: CPU, memory, load avg, 90-day uptime heatmap, response times |
+| `/cluster` | Distributed cache dashboard: 3-node hash ring, gossip events, key browser |
+
+## Development
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
+npm run dev       # http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Build & deploy
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+This is a static export — it builds to `out/` and is SCP'd to the Pixel.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+npm run build     # generates out/
 
-## Learn More
+# Deploy (see phoneix/docs/02-deployment.md for full commands)
+scp -r out/. root@<pixel-ip>:/var/www/phoneix/dashboard/
+ssh root@<pixel-ip> "nginx -s reload"
+```
 
-To learn more about Next.js, take a look at the following resources:
+## Environment
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+The frontend calls the live API at `api.shubhanmehrotra.com`. No `.env` needed locally — API calls go directly to production.

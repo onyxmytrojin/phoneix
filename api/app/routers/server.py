@@ -1,3 +1,4 @@
+import os
 import shutil
 import time
 from datetime import datetime, timezone
@@ -88,9 +89,8 @@ def _read_uptime():
 
 def _read_load():
     try:
-        with open("/proc/loadavg") as f:
-            parts = f.read().split()
-        return [float(parts[0]), float(parts[1]), float(parts[2])]
+        la = os.getloadavg()
+        return [round(la[0], 2), round(la[1], 2), round(la[2], 2)]
     except Exception:
         return [0.0, 0.0, 0.0]
 

@@ -11,7 +11,8 @@ const DASH_PATHS = new Set(["/v1/server","/v1/logs","/v1/cluster","/v1/cluster/k
 type LogEntry = { method?: string; path?: string; status?: number; duration_ms?: number; timestamp?: string };
 type NodeData  = { node_id?: string; id?: string; status?: string; port?: number; keys_held?: number; uptime_seconds?: number; requests_total?: number; peer_states?: Record<string,string> };
 type SrvData   = { uptime_human?: string; cpu_percent?: number; memory?: { used_gb: number; total_gb: number; percent_used: number }; disk?: { free_gb: number; total_gb: number }; load_avg?: number[] };
-type AvailData = { days?: { date: string; status: string; uptime_percent: number }[]; summary?: { last_30_days: number } };
+type AvailDay  = { date: string; status: string; uptime_percent: number; requests?: number; errors?: number };
+type AvailData = { days?: AvailDay[]; summary?: { last_30_days?: number; last_90_days?: number } };
 type RespData  = { endpoints?: Record<string, { p50?: number; count?: number }> };
 type ClusterData = { nodes?: NodeData[]; summary?: { alive?: number; total?: number; total_keys?: number } };
 type ApiOut = { open: boolean; loading: boolean; data: string | null };
@@ -22,6 +23,35 @@ function timeAgo(iso: string) {
   if (s < 3600)  return `${Math.round(s / 60)}m ago`;
   if (s < 86400) return `${Math.round(s / 3600)}h ago`;
   return `${Math.round(s / 86400)}d ago`;
+}
+
+function uptimeColor(d: AvailDay) {
+  if (d.status === "no_data")  return "#1a2a1a";
+  if (d.status === "incident") return "#da3633";
+  if (d.status === "degraded") return "#9a6700";
+  const p = d.uptime_percent;
+  return p === 100 ? "#39d353" : p >= 95 ? "#26a641" : p >= 80 ? "#006d32" : "#0e4429";
+}
+
+function buildWeekGrid(days: AvailDay[]) {
+  if (!days.length) return { weeks: [] as (AvailDay | null)[][], months: [] as {label:string;col:number}[] };
+  const firstDow = new Date(days[0].date + "T12:00:00Z").getUTCDay();
+  const cells: (AvailDay | null)[] = [...Array(firstDow).fill(null), ...days];
+  while (cells.length % 7) cells.push(null);
+  const weeks: (AvailDay | null)[][] = [];
+  for (let i = 0; i < cells.length; i += 7) weeks.push(cells.slice(i, i + 7));
+  const months: { label: string; col: number }[] = [];
+  let last = "";
+  weeks.forEach((wk, col) => {
+    const first = wk.find(d => d !== null);
+    if (!first) return;
+    const m = first.date.slice(0, 7);
+    if (m !== last) {
+      months.push({ label: new Date(first.date + "T12:00:00Z").toLocaleString("default", { month: "short" }), col });
+      last = m;
+    }
+  });
+  return { weeks, months };
 }
 
 function fmtUp(s?: number) {
@@ -64,6 +94,8 @@ export default function ServerPage() {
   const [cluster,   setCluster]  = useState<ClusterData | null>(null);
   const [logs,      setLogs]     = useState<LogEntry[]>([]);
   const [apiOuts,   setApiOuts]  = useState<Record<string, ApiOut>>({});
+  const [uptimeDays, setUptimeDays] = useState(90);
+  const [selDay,    setSelDay]   = useState<AvailDay | null>(null);
 
   useEffect(() => {
     async function fast() {
@@ -232,34 +264,117 @@ export default function ServerPage() {
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
           {/* 30-day uptime */}
           <div style={{ background: "#0d0d14", border: "1px solid #1a1a28", borderRadius: "10px", padding: "18px 20px" }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px" }}>
-              <span style={{ fontSize: "13px", fontWeight: 600 }}>30-Day Uptime</span>
-              {avail?.summary?.last_30_days != null && (
-                <span style={{ fontSize: "11px", color: "#22c55e", background: "rgba(34,197,94,0.1)", border: "1px solid rgba(34,197,94,0.2)", borderRadius: "4px", padding: "2px 8px" }}>
-                  {avail.summary.last_30_days}% avg
-                </span>
-              )}
-            </div>
-            {avail?.days ? (
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(10, 1fr)", gap: "3px", marginBottom: "14px" }}>
-                {avail.days.map((d, i) => (
-                  <div key={i} title={`${d.date}: ${d.uptime_percent ?? "?"}%`} style={{
-                    aspectRatio: "1",
-                    borderRadius: "2px",
-                    background: d.status === "healthy" ? "#26a641" : d.status === "degraded" ? "#f59e0b" : d.status === "incident" ? "#ef4444" : "#1e2730",
-                  }} />
-                ))}
-              </div>
-            ) : (
-              <div style={{ aspectRatio: "1", marginBottom: "14px" }} />
-            )}
-            <div style={{ display: "flex", gap: "14px", flexWrap: "wrap" }}>
-              {[["#22c55e","Healthy"],["#f59e0b","Degraded"],["#ef4444","Incident"],["#1e2030","No data"]].map(([c,l]) => (
-                <div key={l} style={{ display: "flex", alignItems: "center", gap: "5px", fontSize: "11px", color: "#6b7280" }}>
-                  <span style={{ width: "8px", height: "8px", borderRadius: "2px", background: c, flexShrink: 0 }} />{l}
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px" }}>
+              <span style={{ fontSize: "13px", fontWeight: 600 }}>{uptimeDays}-Day Uptime</span>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                <div style={{ display: "flex", gap: "3px" }}>
+                  {[30, 60, 90].map(d => (
+                    <button key={d} onClick={() => { setUptimeDays(d); setSelDay(null); }} style={{
+                      padding: "2px 8px", fontSize: "10px", borderRadius: "4px", border: "none",
+                      cursor: "pointer", fontFamily: "inherit", letterSpacing: "0.04em",
+                      background: uptimeDays === d ? "#4c8ef7" : "#1a1a28",
+                      color: uptimeDays === d ? "#fff" : "#6b7280",
+                      transition: "background 0.15s",
+                    }}>{d}d</button>
+                  ))}
                 </div>
-              ))}
+                {(avail?.summary?.last_90_days ?? avail?.summary?.last_30_days) != null && (
+                  <span style={{ fontSize: "11px", color: "#22c55e", background: "rgba(34,197,94,0.1)", border: "1px solid rgba(34,197,94,0.2)", borderRadius: "4px", padding: "2px 8px" }}>
+                    {avail!.summary!.last_90_days ?? avail!.summary!.last_30_days}% avg
+                  </span>
+                )}
+              </div>
             </div>
+            {(() => {
+              if (!avail?.days) return <div style={{ height: "88px" }} />;
+              const gridDays = avail.days.slice(-uptimeDays);
+              const { weeks, months } = buildWeekGrid(gridDays);
+              const SZ = 10, GAP = 3;
+              const statusLabel = (d: AvailDay) => d.status === "no_data" ? "No data" : d.status.charAt(0).toUpperCase() + d.status.slice(1);
+              const statusColor = (d: AvailDay) => d.status === "incident" ? "#da3633" : d.status === "degraded" ? "#f59e0b" : d.status === "no_data" ? "#6b7280" : "#22c55e";
+              return (
+                <div style={{ overflowX: "auto" }}>
+                  {/* Month labels */}
+                  <div style={{ display: "flex", marginLeft: "20px", marginBottom: "4px", position: "relative", height: "13px" }}>
+                    {months.map(m => (
+                      <div key={m.col} style={{ position: "absolute", left: `${m.col * (SZ + GAP)}px`, fontSize: "9px", color: "#6b7280", whiteSpace: "nowrap", letterSpacing: "0.04em" }}>{m.label}</div>
+                    ))}
+                  </div>
+                  <div style={{ display: "flex", gap: `${GAP}px` }}>
+                    {/* Day-of-week labels */}
+                    <div style={{ display: "flex", flexDirection: "column", gap: `${GAP}px`, paddingTop: "1px" }}>
+                      {["","M","","W","","F",""].map((l, i) => (
+                        <div key={i} style={{ width: "13px", height: `${SZ}px`, fontSize: "9px", color: "#6b7280", lineHeight: `${SZ}px`, textAlign: "right" }}>{l}</div>
+                      ))}
+                    </div>
+                    {/* Week columns */}
+                    {weeks.map((wk, wi) => (
+                      <div key={wi} style={{ display: "flex", flexDirection: "column", gap: `${GAP}px` }}>
+                        {wk.map((day, di) => (
+                          <div key={di}
+                            onClick={() => day && setSelDay(selDay?.date === day.date ? null : day)}
+                            style={{
+                              width: `${SZ}px`, height: `${SZ}px`, borderRadius: "2px",
+                              background: day ? uptimeColor(day) : "transparent",
+                              cursor: day ? "pointer" : "default",
+                              outline: day && selDay?.date === day.date ? "2px solid #e8eaf0" : "none",
+                              outlineOffset: "1px",
+                            }} />
+                        ))}
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Selected day popover */}
+                  {selDay && (
+                    <div style={{ marginTop: "10px", padding: "10px 14px", background: "#0a0a12", border: `1px solid ${statusColor(selDay)}40`, borderLeft: `3px solid ${statusColor(selDay)}`, borderRadius: "6px", fontSize: "12px", display: "flex", flexWrap: "wrap", gap: "14px", alignItems: "center" }}>
+                      <div>
+                        <div style={{ fontWeight: 600, marginBottom: "2px" }}>{new Date(selDay.date + "T12:00:00Z").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" })}</div>
+                        <div style={{ display: "flex", alignItems: "center", gap: "5px", fontSize: "11px" }}>
+                          <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: statusColor(selDay), flexShrink: 0 }} />
+                          <span style={{ color: statusColor(selDay), fontWeight: 600, textTransform: "capitalize" }}>{statusLabel(selDay)}</span>
+                        </div>
+                      </div>
+                      {selDay.status !== "no_data" && <>
+                        <div style={{ textAlign: "center" }}>
+                          <div style={{ fontSize: "18px", fontWeight: 700, color: "#e8eaf0", lineHeight: 1 }}>{selDay.uptime_percent}%</div>
+                          <div style={{ fontSize: "10px", color: "#6b7280", letterSpacing: "0.06em", textTransform: "uppercase" }}>uptime</div>
+                        </div>
+                        <div style={{ textAlign: "center" }}>
+                          <div style={{ fontSize: "18px", fontWeight: 700, color: "#e8eaf0", lineHeight: 1 }}>{(selDay.requests ?? 0).toLocaleString()}</div>
+                          <div style={{ fontSize: "10px", color: "#6b7280", letterSpacing: "0.06em", textTransform: "uppercase" }}>requests</div>
+                        </div>
+                        <div style={{ textAlign: "center" }}>
+                          <div style={{ fontSize: "18px", fontWeight: 700, color: (selDay.errors ?? 0) > 0 ? "#da3633" : "#e8eaf0", lineHeight: 1 }}>{(selDay.errors ?? 0).toLocaleString()}</div>
+                          <div style={{ fontSize: "10px", color: "#6b7280", letterSpacing: "0.06em", textTransform: "uppercase" }}>errors</div>
+                        </div>
+                        {(selDay.requests ?? 0) > 0 && (selDay.errors ?? 0) === 0 && (
+                          <div style={{ fontSize: "11px", color: "#6b7280" }}>No 5xx errors · all requests succeeded</div>
+                        )}
+                      </>}
+                      {selDay.status === "no_data" && (
+                        <div style={{ fontSize: "11px", color: "#6b7280" }}>Server was not running or no requests recorded on this day.</div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Legend */}
+                  <div style={{ display: "flex", alignItems: "center", gap: "6px", marginTop: "10px", fontSize: "10px", color: "#6b7280" }}>
+                    <span>Less</span>
+                    {(["#1a2a1a","#0e4429","#006d32","#26a641","#39d353"] as string[]).map(c => (
+                      <div key={c} style={{ width: `${SZ}px`, height: `${SZ}px`, borderRadius: "2px", background: c, flexShrink: 0 }} />
+                    ))}
+                    <span>More</span>
+                    <span style={{ marginLeft: "8px", display: "flex", alignItems: "center", gap: "4px" }}>
+                      <div style={{ width: `${SZ}px`, height: `${SZ}px`, borderRadius: "2px", background: "#9a6700" }} /> Degraded
+                    </span>
+                    <span style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+                      <div style={{ width: `${SZ}px`, height: `${SZ}px`, borderRadius: "2px", background: "#da3633" }} /> Incident
+                    </span>
+                  </div>
+                </div>
+              );
+            })()}
           </div>
 
           {/* Response times */}
