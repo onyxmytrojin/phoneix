@@ -1,4 +1,4 @@
-const API = "https://api.shubhanmehrotra.com";
+import { API } from "./utils";
 
 export interface GithubData {
   username: string;
@@ -24,7 +24,7 @@ export interface ServerData {
 
 export async function fetchGithub(): Promise<GithubData | null> {
   try {
-    const res = await fetch(`${API}/v1/github`, { next: { revalidate: 300 } });
+    const res = await fetch(`${API}/v1/github`);
     if (!res.ok) return null;
     return res.json();
   } catch {
@@ -34,7 +34,7 @@ export async function fetchGithub(): Promise<GithubData | null> {
 
 export async function fetchServer(): Promise<ServerData | null> {
   try {
-    const res = await fetch(`${API}/v1/server`, { next: { revalidate: 30 } });
+    const res = await fetch(`${API}/v1/server`);
     if (!res.ok) return null;
     return res.json();
   } catch {

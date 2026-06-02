@@ -2,8 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
-
-const API = "https://api.shubhanmehrotra.com";
+import { API, fmtUp } from "@/lib/utils";
 
 type NodeData = {
   node_id?: string; id?: string; status?: string; port?: number;
@@ -29,12 +28,6 @@ const C = {
 const sc = (s?: string) => ["alive","suspect","dead"].includes(s ?? "") ? s! : "unreachable";
 const sColor = (s: string) => s === "alive" ? C.alive : s === "suspect" ? C.suspect : C.dead;
 
-function fmtUp(s?: number) {
-  if (s == null) return "—";
-  if (s < 60)   return `${s}s`;
-  if (s < 3600) return `${Math.floor(s/60)}m ${s%60}s`;
-  return `${Math.floor(s/3600)}h ${Math.floor((s%3600)/60)}m`;
-}
 function fmtMem(b?: number) {
   if (!b) return "—";
   return b < 1048576 ? `${(b/1024).toFixed(0)} KB` : `${(b/1048576).toFixed(1)} MB`;
@@ -132,8 +125,8 @@ export default function ClusterPage() {
     setEvents(p => [{time:hhmm(),cls,text},...p].slice(0,30));
   };
 
-  const fetchCluster = async () => {
-    const d = await fetch(`${API}/v1/cluster`,{cache:"no-store"}).then(r=>r.json()).catch(()=>null);
+  const fetchCluster = async (signal: AbortSignal) => {
+    const d = await fetch(`${API}/v1/cluster`, { signal, cache: "no-store" }).then(r=>r.json()).catch(()=>null);
     if (!d) return;
     setData(d);
     setTs(new Date().toTimeString().slice(0,8));
@@ -148,11 +141,10 @@ export default function ClusterPage() {
         ps[k] = pst as string;
       });
     });
-    prevStates.current = ps;
   };
 
-  const fetchKeys = async () => {
-    const d = await fetch(`${API}/v1/cluster/keys`,{cache:"no-store"}).then(r=>r.json()).catch(()=>null);
+  const fetchKeys = async (signal: AbortSignal) => {
+    const d = await fetch(`${API}/v1/cluster/keys`, { signal, cache: "no-store" }).then(r=>r.json()).catch(()=>null);
     if (!d?.keys) return;
     const kl: KeyData[] = d.keys;
     const cur = new Set(kl.map((k:KeyData)=>k.key));
@@ -166,11 +158,18 @@ export default function ClusterPage() {
   };
 
   useEffect(() => {
+    const ac = new AbortController();
+    const { signal } = ac;
+
+    async function tick() {
+      await Promise.all([fetchCluster(signal), fetchKeys(signal)]);
+    }
+
     push("cluster","","connecting…");
-    fetchCluster(); fetchKeys();
-    const ci = setInterval(fetchCluster, 5000);
-    const ki = setInterval(fetchKeys, 5000);
-    return () => { clearInterval(ci); clearInterval(ki); };
+    tick();
+    const id = setInterval(tick, 5000);
+    return () => { ac.abort(); clearInterval(id); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const triggerRebal = async () => {

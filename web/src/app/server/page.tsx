@@ -1,9 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
-
-const API = "https://api.shubhanmehrotra.com";
+import { API, fmtUp } from "@/lib/utils";
 
 const DASH_PATHS = new Set(["/v1/server","/v1/logs","/v1/cluster","/v1/cluster/keys",
   "/v1/ping","/v1/response-times","/v1/availability","/v1/visitors"]);
@@ -25,10 +24,17 @@ function timeAgo(iso: string) {
   return `${Math.round(s / 86400)}d ago`;
 }
 
+const STATUS_COLOR = {
+  incident: "#da3633",
+  degraded: "#f59e0b",
+  no_data:  "#1a2a1a",
+  healthy:  "#39d353",
+} as const;
+
 function uptimeColor(d: AvailDay) {
-  if (d.status === "no_data")  return "#1a2a1a";
-  if (d.status === "incident") return "#da3633";
-  if (d.status === "degraded") return "#9a6700";
+  if (d.status === "no_data")  return STATUS_COLOR.no_data;
+  if (d.status === "incident") return STATUS_COLOR.incident;
+  if (d.status === "degraded") return STATUS_COLOR.degraded;
   const p = d.uptime_percent;
   return p === 100 ? "#39d353" : p >= 95 ? "#26a641" : p >= 80 ? "#006d32" : "#0e4429";
 }
@@ -52,13 +58,6 @@ function buildWeekGrid(days: AvailDay[]) {
     }
   });
   return { weeks, months };
-}
-
-function fmtUp(s?: number) {
-  if (s == null) return "—";
-  if (s < 60)   return `${s}s`;
-  if (s < 3600) return `${Math.floor(s / 60)}m`;
-  return `${Math.floor(s / 3600)}h ${Math.floor((s % 3600) / 60)}m`;
 }
 
 const API_GROUPS = [
@@ -98,10 +97,13 @@ export default function ServerPage() {
   const [selDay,    setSelDay]   = useState<AvailDay | null>(null);
 
   useEffect(() => {
+    const ac = new AbortController();
+    const { signal } = ac;
+
     async function fast() {
       const [s, l] = await Promise.all([
-        fetch(`${API}/v1/server`).then(r => r.json()).catch(() => null),
-        fetch(`${API}/v1/logs`).then(r => r.json()).catch(() => null),
+        fetch(`${API}/v1/server`, { signal }).then(r => r.json()).catch(() => null),
+        fetch(`${API}/v1/logs`,   { signal }).then(r => r.json()).catch(() => null),
       ]);
       if (s) setSrv(s);
       if (l?.logs) {
@@ -112,9 +114,9 @@ export default function ServerPage() {
     }
     async function slow() {
       const [a, r, c] = await Promise.all([
-        fetch(`${API}/v1/availability`).then(x => x.json()).catch(() => null),
-        fetch(`${API}/v1/response-times`).then(x => x.json()).catch(() => null),
-        fetch(`${API}/v1/cluster`).then(x => x.json()).catch(() => null),
+        fetch(`${API}/v1/availability`,    { signal }).then(x => x.json()).catch(() => null),
+        fetch(`${API}/v1/response-times`,  { signal }).then(x => x.json()).catch(() => null),
+        fetch(`${API}/v1/cluster`,         { signal }).then(x => x.json()).catch(() => null),
       ]);
       if (a) setAvail(a);
       if (r) setResp(r);
@@ -123,7 +125,7 @@ export default function ServerPage() {
     fast(); slow();
     const fi = setInterval(fast, 5000);
     const si = setInterval(slow, 15000);
-    return () => { clearInterval(fi); clearInterval(si); };
+    return () => { ac.abort(); clearInterval(fi); clearInterval(si); };
   }, []);
 
   async function tryEndpoint(path: string, method = "GET") {
@@ -152,14 +154,17 @@ export default function ServerPage() {
   const diskPct  = diskTot > 0 ? ((diskTot - diskFree) / diskTot) * 100 : 0;
   const load     = srv?.load_avg ?? [0, 0, 0];
 
-  const respRows = resp?.endpoints
-    ? Object.entries(resp.endpoints)
-        .map(([path, s]) => ({ path, avg: s.p50 ?? 0, count: s.count ?? 0 }))
-        .filter(e => e.path.startsWith("/v1/"))
-        .sort((a, b) => b.count - a.count)
-        .slice(0, 9)
-    : [];
-  const maxAvg = Math.max(...respRows.map(e => e.avg), 1);
+  const respRows = useMemo(() =>
+    resp?.endpoints
+      ? Object.entries(resp.endpoints)
+          .map(([path, s]) => ({ path, avg: s.p50 ?? 0, count: s.count ?? 0 }))
+          .filter(e => e.path.startsWith("/v1/"))
+          .sort((a, b) => b.count - a.count)
+          .slice(0, 9)
+      : [],
+    [resp]
+  );
+  const maxAvg = useMemo(() => Math.max(...respRows.map(e => e.avg), 1), [respRows]);
 
   const BAR = (pct: number, color: string) => (
     <div style={{ height: "4px", background: "#1a1a28", borderRadius: "2px", overflow: "hidden", margin: "8px 0 6px" }}>
@@ -291,7 +296,7 @@ export default function ServerPage() {
               const { weeks, months } = buildWeekGrid(gridDays);
               const SZ = 10, GAP = 3;
               const statusLabel = (d: AvailDay) => d.status === "no_data" ? "No data" : d.status.charAt(0).toUpperCase() + d.status.slice(1);
-              const statusColor = (d: AvailDay) => d.status === "incident" ? "#da3633" : d.status === "degraded" ? "#f59e0b" : d.status === "no_data" ? "#6b7280" : "#22c55e";
+              const statusColor = (d: AvailDay) => d.status === "no_data" ? "#6b7280" : STATUS_COLOR[d.status as keyof typeof STATUS_COLOR] ?? "#22c55e";
               return (
                 <div style={{ overflowX: "auto" }}>
                   {/* Month labels */}
@@ -366,10 +371,10 @@ export default function ServerPage() {
                     ))}
                     <span>More</span>
                     <span style={{ marginLeft: "8px", display: "flex", alignItems: "center", gap: "4px" }}>
-                      <div style={{ width: `${SZ}px`, height: `${SZ}px`, borderRadius: "2px", background: "#9a6700" }} /> Degraded
+                      <div style={{ width: `${SZ}px`, height: `${SZ}px`, borderRadius: "2px", background: STATUS_COLOR.degraded }} /> Degraded
                     </span>
                     <span style={{ display: "flex", alignItems: "center", gap: "4px" }}>
-                      <div style={{ width: `${SZ}px`, height: `${SZ}px`, borderRadius: "2px", background: "#da3633" }} /> Incident
+                      <div style={{ width: `${SZ}px`, height: `${SZ}px`, borderRadius: "2px", background: STATUS_COLOR.incident }} /> Incident
                     </span>
                   </div>
                 </div>

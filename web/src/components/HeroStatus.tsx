@@ -1,25 +1,28 @@
 "use client";
 import { useEffect, useState } from "react";
-
-const API = "https://api.shubhanmehrotra.com";
+import { API } from "@/lib/utils";
 
 export default function HeroStatus() {
   const [cpu, setCpu] = useState<number | null>(null);
   const [uptime, setUptime] = useState<string | null>(null);
 
   useEffect(() => {
+    const ac = new AbortController();
+    const { signal } = ac;
+
     async function check() {
       try {
-        const res = await fetch(`${API}/v1/server`);
+        const res = await fetch(`${API}/v1/server`, { signal });
         if (!res.ok) return;
         const d = await res.json();
         if (typeof d?.cpu_percent === "number") setCpu(d.cpu_percent);
         if (d?.uptime_human) setUptime(d.uptime_human);
       } catch {}
     }
+
     check();
     const id = setInterval(check, 30000);
-    return () => clearInterval(id);
+    return () => { ac.abort(); clearInterval(id); };
   }, []);
 
   return (

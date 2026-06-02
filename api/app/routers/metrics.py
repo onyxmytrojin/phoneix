@@ -3,6 +3,7 @@ import asyncio.subprocess as asp
 import json
 import os
 import statistics
+import time
 from collections import defaultdict
 from datetime import datetime, timezone, timedelta
 
@@ -39,21 +40,52 @@ LOG_PATH_ABS = os.path.join(os.path.dirname(__file__), "../../logs/requests.json
 
 
 def _read_logs(hours: int = 24) -> list[dict]:
+    """Read log entries within the last `hours` by scanning backward from EOF.
+    Stops as soon as it finds a line older than the cutoff, so short windows
+    are O(recent data) rather than O(total file size)."""
     cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
-    entries = []
+    results: list[dict] = []
+    chunk = 1 << 16  # 64 KiB
     try:
-        with open(LOG_PATH_ABS) as f:
-            for line in f:
+        with open(LOG_PATH_ABS, "rb") as f:
+            f.seek(0, 2)
+            pos = f.tell()
+            tail = b""
+            while pos > 0:
+                step = min(chunk, pos)
+                pos -= step
+                f.seek(pos)
+                block = f.read(step) + tail
+                lines = block.split(b"\n")
+                tail = lines[0]
+                for raw in reversed(lines[1:]):
+                    raw = raw.strip()
+                    if not raw:
+                        continue
+                    try:
+                        e = json.loads(raw)
+                        ts = datetime.fromisoformat(e["timestamp"])
+                        if ts < cutoff:
+                            results.reverse()
+                            return results
+                        results.append(e)
+                    except Exception:
+                        continue
+            if tail.strip():
                 try:
-                    e = json.loads(line.strip())
+                    e = json.loads(tail.strip())
                     ts = datetime.fromisoformat(e["timestamp"])
                     if ts >= cutoff:
-                        entries.append(e)
+                        results.append(e)
                 except Exception:
-                    continue
+                    pass
     except FileNotFoundError:
         pass
-    return entries
+    results.reverse()
+    return results
+
+
+_avail_cache: tuple[float, dict] | None = None
 
 
 @router.get("/response-times")
@@ -115,7 +147,10 @@ async def metrics(response: Response):
 
 @router.get("/availability")
 async def availability(response: Response):
+    global _avail_cache
     response.headers["Cache-Control"] = "max-age=300"
+    if _avail_cache and time.monotonic() - _avail_cache[0] < 300:
+        return _avail_cache[1]
     logs = _read_logs(24 * 90)
 
     # bucket logs by day
@@ -145,13 +180,15 @@ async def availability(response: Response):
     all_pcts = [d["uptime_percent"] for d in days if d["status"] != "no_data"]
     avg = round(sum(all_pcts) / len(all_pcts), 2) if all_pcts else 100.0
 
-    return {
+    result = {
         "days": days,
         "summary": {
             "last_90_days": avg,
             "today": days[-1]["uptime_percent"] if days else 100.0,
         }
     }
+    _avail_cache = (time.monotonic(), result)
+    return result
 
 
 @router.get("/visitors")

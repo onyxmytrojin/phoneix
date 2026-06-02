@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { API } from "@/lib/utils";
 
 const NAV_LINKS = [
   { href: "/#home",       label: "Home" },
@@ -17,11 +18,14 @@ export default function Nav() {
   const [showMem, setShowMem] = useState(false);
 
   useEffect(() => {
+    const ac = new AbortController();
+    const { signal } = ac;
+
     async function check() {
       try {
         const [pingRes, srvRes] = await Promise.all([
-          fetch("https://api.shubhanmehrotra.com/v1/ping"),
-          fetch("https://api.shubhanmehrotra.com/v1/server"),
+          fetch(`${API}/v1/ping`, { signal }),
+          fetch(`${API}/v1/server`, { signal }),
         ]);
         setOnline(pingRes.ok);
         if (srvRes.ok) {
@@ -32,9 +36,10 @@ export default function Nav() {
         setOnline(false);
       }
     }
+
     check();
     const id = setInterval(check, 30000);
-    return () => clearInterval(id);
+    return () => { ac.abort(); clearInterval(id); };
   }, []);
 
   return (
@@ -56,7 +61,6 @@ export default function Nav() {
       </div>
 
       <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-        {/* Server status pill */}
         <div style={{ position: "relative" }}
           onMouseEnter={() => setShowMem(true)}
           onMouseLeave={() => setShowMem(false)}
@@ -84,7 +88,7 @@ export default function Nav() {
               padding: "8px 12px", fontSize: "12px", color: "#9aa3b8", whiteSpace: "nowrap",
               boxShadow: "0 8px 24px rgba(0,0,0,0.5)",
             }}>
-              💾 Memory usage: {memMb} MB
+              Memory usage: {memMb} MB
             </div>
           )}
         </div>
