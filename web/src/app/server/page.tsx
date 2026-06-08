@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
-import { API, fmtUp } from "@/lib/utils";
+import { API, fmtUp, timeAgo } from "@/lib/utils";
 
 const DASH_PATHS = new Set(["/v1/server","/v1/logs","/v1/cluster","/v1/cluster/keys",
   "/v1/ping","/v1/response-times","/v1/availability","/v1/visitors"]);
@@ -12,17 +12,11 @@ type NodeData  = { node_id?: string; id?: string; status?: string; port?: number
 type SrvData   = { uptime_human?: string; cpu_percent?: number; memory?: { used_gb: number; total_gb: number; percent_used: number }; disk?: { free_gb: number; total_gb: number }; load_avg?: number[] };
 type AvailDay  = { date: string; status: string; uptime_percent: number; requests?: number; errors?: number };
 type AvailData = { days?: AvailDay[]; summary?: { last_30_days?: number; last_90_days?: number } };
-type RespData  = { endpoints?: Record<string, { p50?: number; count?: number }> };
-type ClusterData = { nodes?: NodeData[]; summary?: { alive?: number; total?: number; total_keys?: number } };
+type RespData     = { endpoints?: Record<string, { p50?: number; count?: number }> };
+type ClusterData  = { nodes?: NodeData[]; summary?: { alive?: number; total?: number; total_keys?: number } };
+type VisitorData  = { today?: number; this_week?: number; all_time?: number };
 type ApiOut = { open: boolean; loading: boolean; data: string | null };
 
-function timeAgo(iso: string) {
-  const s = (Date.now() - new Date(iso).getTime()) / 1000;
-  if (s < 60)    return `${Math.round(s)}s ago`;
-  if (s < 3600)  return `${Math.round(s / 60)}m ago`;
-  if (s < 86400) return `${Math.round(s / 3600)}h ago`;
-  return `${Math.round(s / 86400)}d ago`;
-}
 
 const STATUS_COLOR = {
   incident: "#da3633",
@@ -93,6 +87,7 @@ export default function ServerPage() {
   const [cluster,   setCluster]  = useState<ClusterData | null>(null);
   const [logs,      setLogs]     = useState<LogEntry[]>([]);
   const [apiOuts,   setApiOuts]  = useState<Record<string, ApiOut>>({});
+  const [visitors,  setVisitors] = useState<VisitorData | null>(null);
   const [uptimeDays, setUptimeDays] = useState(90);
   const [selDay,    setSelDay]   = useState<AvailDay | null>(null);
 
@@ -113,14 +108,16 @@ export default function ServerPage() {
       }
     }
     async function slow() {
-      const [a, r, c] = await Promise.all([
-        fetch(`${API}/v1/availability`,    { signal }).then(x => x.json()).catch(() => null),
-        fetch(`${API}/v1/response-times`,  { signal }).then(x => x.json()).catch(() => null),
-        fetch(`${API}/v1/cluster`,         { signal }).then(x => x.json()).catch(() => null),
+      const [a, r, c, v] = await Promise.all([
+        fetch(`${API}/v1/availability`,   { signal }).then(x => x.json()).catch(() => null),
+        fetch(`${API}/v1/response-times`, { signal }).then(x => x.json()).catch(() => null),
+        fetch(`${API}/v1/cluster`,        { signal }).then(x => x.json()).catch(() => null),
+        fetch(`${API}/v1/visitors`,       { signal }).then(x => x.json()).catch(() => null),
       ]);
       if (a) setAvail(a);
       if (r) setResp(r);
       if (c) setCluster(c);
+      if (v) setVisitors(v);
     }
     fast(); slow();
     const fi = setInterval(fast, 5000);
@@ -231,7 +228,7 @@ export default function ServerPage() {
       <div style={{ maxWidth: "960px", margin: "0 auto", padding: "24px", display: "flex", flexDirection: "column", gap: "16px" }}>
 
         {/* Stats row */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "12px" }}>
+        <div className="stats-grid">
           {/* CPU */}
           <div style={{ background: "#0d0d14", border: "1px solid #1a1a28", borderRadius: "10px", padding: "16px 18px" }}>
             <div style={{ fontSize: "11px", color: "#6b7280", letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: "6px" }}>CPU</div>
@@ -263,10 +260,22 @@ export default function ServerPage() {
               ))}
             </div>
           </div>
+          {/* Visitors */}
+          <div style={{ background: "#0d0d14", border: "1px solid #1a1a28", borderRadius: "10px", padding: "16px 18px" }}>
+            <div style={{ fontSize: "11px", color: "#6b7280", letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: "6px" }}>Visitors</div>
+            <div style={{ fontSize: "28px", fontWeight: 800, lineHeight: 1.1 }}>{visitors?.today ?? "—"}</div>
+            <div style={{ display: "flex", gap: "6px", marginTop: "8px", flexWrap: "wrap" }}>
+              {visitors && <>
+                <span style={{ fontSize: "10px", color: "#6b7280", background: "#1a1a28", borderRadius: "4px", padding: "2px 6px", fontVariantNumeric: "tabular-nums" }}>{visitors.this_week} wk</span>
+                <span style={{ fontSize: "10px", color: "#6b7280", background: "#1a1a28", borderRadius: "4px", padding: "2px 6px", fontVariantNumeric: "tabular-nums" }}>{visitors.all_time} total</span>
+              </>}
+            </div>
+            <div style={{ fontSize: "11px", color: "#363650", marginTop: "4px" }}>unique IPs today</div>
+          </div>
         </div>
 
         {/* Two-column: uptime | response times */}
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+        <div className="split-grid">
           {/* 30-day uptime */}
           <div style={{ background: "#0d0d14", border: "1px solid #1a1a28", borderRadius: "10px", padding: "18px 20px" }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px" }}>
@@ -429,7 +438,7 @@ export default function ServerPage() {
                 <span>{cluster.summary?.total_keys ?? 0} keys cached</span>
                 <span>3-node consistent hash ring</span>
               </div>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "10px" }}>
+              <div className="cache-nodes-grid">
                 {(cluster.nodes || []).map(n => {
                   const id = n.node_id || n.id || "?";
                   const alive = n.status === "alive";
@@ -491,8 +500,8 @@ export default function ServerPage() {
                   <span style={{ color: mCol, fontFamily: "var(--font-geist-mono),monospace", fontWeight: 600 }}>{r.method ?? "GET"}</span>
                   <code style={{ color: "#9aa3b8", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontFamily: "var(--font-geist-mono),monospace" }}>{r.path ?? "—"}</code>
                   <span style={{ color: sCol, fontFamily: "var(--font-geist-mono),monospace" }}>{s}</span>
-                  <span style={{ color: "#6b7280" }}>{r.duration_ms != null ? `${r.duration_ms.toFixed(0)}ms` : "—"}</span>
-                  <span style={{ color: "#363650" }}>{r.timestamp ? timeAgo(r.timestamp) : "—"}</span>
+                  <span className="log-col-time" style={{ color: "#6b7280" }}>{r.duration_ms != null ? `${r.duration_ms.toFixed(0)}ms` : "—"}</span>
+                  <span className="log-col-when" style={{ color: "#363650" }}>{r.timestamp ? timeAgo(r.timestamp) : "—"}</span>
                 </div>
               );
             })}

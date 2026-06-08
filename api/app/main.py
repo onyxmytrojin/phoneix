@@ -1,3 +1,4 @@
+import asyncio
 from datetime import datetime, timezone
 
 from fastapi import FastAPI, Request
@@ -11,6 +12,8 @@ from app.config import ALLOWED_ORIGIN, RATE_LIMIT
 from app.db.database import init_db, close_db
 from app.middleware.logging import RequestLoggingMiddleware
 from app.routers import health, server, github, profile, metrics, discovery
+from app.routers.github import warm_cache
+from app.routers.metrics import _rotate_logs
 
 limiter = Limiter(key_func=get_remote_address, default_limits=[f"{RATE_LIMIT}/minute"])
 
@@ -41,9 +44,18 @@ app.include_router(metrics.router, prefix="/v1")
 app.include_router(discovery.router, prefix="/v1")
 
 
+async def _rotation_loop():
+    await asyncio.sleep(300)  # let startup settle before first run
+    while True:
+        _rotate_logs()
+        await asyncio.sleep(24 * 3600)
+
+
 @app.on_event("startup")
 async def startup():
     await init_db()
+    asyncio.create_task(warm_cache())
+    asyncio.create_task(_rotation_loop())
 
 
 @app.on_event("shutdown")

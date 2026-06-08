@@ -88,6 +88,41 @@ def _read_logs(hours: int = 24) -> list[dict]:
 _avail_cache: tuple[float, dict] | None = None
 
 
+def _rotate_logs() -> int:
+    """Remove entries older than 90 days. Writes atomically via a temp file.
+    Returns the number of entries removed."""
+    global _avail_cache
+    cutoff = datetime.now(timezone.utc) - timedelta(days=90)
+    try:
+        if not os.path.exists(LOG_PATH_ABS):
+            return 0
+        kept: list[str] = []
+        removed = 0
+        with open(LOG_PATH_ABS) as f:
+            for line in f:
+                stripped = line.strip()
+                if not stripped:
+                    continue
+                try:
+                    ts = datetime.fromisoformat(json.loads(stripped)["timestamp"])
+                    if ts < cutoff:
+                        removed += 1
+                        continue
+                except Exception:
+                    pass
+                kept.append(line if line.endswith("\n") else line + "\n")
+        if removed == 0:
+            return 0
+        tmp = LOG_PATH_ABS + ".tmp"
+        with open(tmp, "w") as f:
+            f.writelines(kept)
+        os.replace(tmp, LOG_PATH_ABS)
+        _avail_cache = None
+        return removed
+    except Exception:
+        return 0
+
+
 @router.get("/response-times")
 async def response_times(response: Response):
     response.headers["Cache-Control"] = "no-store"

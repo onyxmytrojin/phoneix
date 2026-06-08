@@ -2,6 +2,7 @@ import Image from "next/image";
 import Nav from "@/components/Nav";
 import ExperienceTabs from "@/components/ExperienceTabs";
 import HeroStatus from "@/components/HeroStatus";
+import TimeAgo from "@/components/TimeAgo";
 import { fetchGithub } from "@/lib/api";
 
 type SkillItem = { label: string; highlight?: boolean };
@@ -159,7 +160,7 @@ export default async function Home() {
                 <a key={i} href={c.url} target="_blank" rel="noreferrer" className="commit-card">
                   <div style={{ fontSize: "10px", color: "#4c8ef7", fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: "4px" }}>{c.repo}</div>
                   <div style={{ fontSize: "13px", color: "#e8eaf0", lineHeight: 1.5 }}>{c.message}</div>
-                  <div style={{ fontSize: "11px", color: "#363650", marginTop: "6px" }}>{c.time_ago}</div>
+                  <div style={{ fontSize: "11px", color: "#363650", marginTop: "6px" }}><TimeAgo date={c.date} fallback={c.time_ago} /></div>
                 </a>
               ))}
             </div>

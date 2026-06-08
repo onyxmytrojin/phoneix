@@ -219,13 +219,13 @@ export default function ClusterPage() {
     <div style={{minHeight:"100vh",background:C.bg,color:C.text,fontFamily:"'Cascadia Code','JetBrains Mono','Fira Mono',ui-monospace,'Courier New',monospace",fontSize:"13px"}}>
 
       {/* ── Header ── */}
-      <header style={{position:"sticky",top:0,zIndex:10,display:"flex",alignItems:"center",gap:"24px",padding:"0 24px",height:"52px",background:C.surf,borderBottom:`1px solid ${C.border}`}}>
+      <header className="cluster-header" style={{background:C.surf,borderBottom:`1px solid ${C.border}`}}>
         <div style={{fontSize:"13px",fontWeight:600,letterSpacing:"0.04em",whiteSpace:"nowrap"}}>
           <Link href="/" style={{color:C.muted,fontWeight:400,textDecoration:"none"}}>phoneix</Link>
           <span style={{color:C.muted}}> / </span>
           <span>cache cluster</span>
         </div>
-        <div style={{display:"flex",gap:"20px",marginRight:"auto"}}>
+        <div style={{display:"flex",gap:"16px",marginRight:"auto",flexWrap:"wrap"}}>
           {[
             {v:alive!=null&&total!=null?`${alive}/${total}`:"—", l:"nodes alive"},
             {v:totalK??"—",                                      l:"total keys"},
@@ -249,7 +249,7 @@ export default function ClusterPage() {
       <div style={{padding:"20px 24px",display:"flex",flexDirection:"column",gap:"16px",maxWidth:"1080px"}}>
 
         {/* ── Node cards + ring ── */}
-        <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr) 196px",gap:"12px",alignItems:"start"}}>
+        <div className="cluster-nodes-grid">
           {data ? data.nodes.map((n,i) => {
             const id  = n.node_id||n.id||"?";
             const st  = sc(n.status);

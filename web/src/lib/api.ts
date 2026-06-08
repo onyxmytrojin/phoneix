@@ -9,6 +9,7 @@ export interface GithubData {
   recent_commits: Array<{
     repo: string;
     message: string;
+    date: string;
     time_ago: string;
     url: string;
   }>;
