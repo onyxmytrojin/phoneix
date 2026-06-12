@@ -14,6 +14,7 @@ from app.middleware.logging import RequestLoggingMiddleware
 from app.routers import health, server, github, profile, metrics, discovery
 from app.routers.github import warm_cache
 from app.routers.metrics import _rotate_logs
+from app.routers.webhook import router as webhook_router
 
 limiter = Limiter(key_func=get_remote_address, default_limits=[f"{RATE_LIMIT}/minute"])
 
@@ -42,6 +43,7 @@ app.include_router(github.router, prefix="/v1")
 app.include_router(profile.router, prefix="/v1")
 app.include_router(metrics.router, prefix="/v1")
 app.include_router(discovery.router, prefix="/v1")
+app.include_router(webhook_router)
 
 
 async def _rotation_loop():
