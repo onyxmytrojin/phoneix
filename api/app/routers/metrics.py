@@ -188,29 +188,43 @@ async def availability(response: Response):
         return _avail_cache[1]
     logs = _read_logs(24 * 90)
 
-    # bucket logs by day
-    by_day: dict[str, list] = defaultdict(list)
+    # bucket logs by day — keep full entries for gap detection
+    by_day: dict[str, list[dict]] = defaultdict(list)
     for e in logs:
         try:
-            day = e["timestamp"][:10]
-            by_day[day].append(e["status"])
+            by_day[e["timestamp"][:10]].append(e)
         except Exception:
             continue
 
     today = datetime.now(timezone.utc).date()
+    # Gossip fires every 2 s, so a gap of >5 min means the server was genuinely down.
+    GAP_S = 5 * 60
     days = []
     for i in range(89, -1, -1):
         day = (today - timedelta(days=i)).isoformat()
-        statuses = by_day.get(day, [])
-        if not statuses:
-            pct = 100.0
-            status = "no_data"
-            errors_count = 0
-        else:
-            errors_count = sum(1 for s in statuses if s >= 500)
-            pct = round((1 - errors_count / len(statuses)) * 100, 1)
-            status = "healthy" if pct == 100 else "degraded" if pct >= 95 else "incident"
-        days.append({"date": day, "uptime_percent": pct, "status": status, "requests": len(statuses), "errors": errors_count})
+        entries = by_day.get(day, [])
+        if not entries:
+            days.append({"date": day, "uptime_percent": 100.0, "status": "no_data", "requests": 0, "errors": 0})
+            continue
+
+        errors_count = sum(1 for e in entries if e.get("status", 200) >= 500)
+
+        # Detect downtime from gaps between consecutive log entries.
+        ts_list = sorted(
+            datetime.fromisoformat(e["timestamp"])
+            for e in entries if e.get("timestamp")
+        )
+        downtime_s = sum(
+            (ts_list[j] - ts_list[j - 1]).total_seconds()
+            for j in range(1, len(ts_list))
+            if (ts_list[j] - ts_list[j - 1]).total_seconds() > GAP_S
+        )
+
+        gap_pct  = round(max(0.0, (86400.0 - downtime_s) / 86400.0 * 100), 1)
+        err_pct  = round((1 - errors_count / len(entries)) * 100, 1)
+        pct      = min(gap_pct, err_pct)
+        status   = "healthy" if pct >= 99.0 else "degraded" if pct >= 90.0 else "incident"
+        days.append({"date": day, "uptime_percent": pct, "status": status, "requests": len(entries), "errors": errors_count})
 
     all_pcts = [d["uptime_percent"] for d in days if d["status"] != "no_data"]
     avg = round(sum(all_pcts) / len(all_pcts), 2) if all_pcts else 100.0
