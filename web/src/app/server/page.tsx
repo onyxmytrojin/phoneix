@@ -362,8 +362,14 @@ export default function ServerPage() {
                           <div style={{ fontSize: "18px", fontWeight: 700, color: (selDay.errors ?? 0) > 0 ? "#da3633" : "#e8eaf0", lineHeight: 1 }}>{(selDay.errors ?? 0).toLocaleString()}</div>
                           <div style={{ fontSize: "10px", color: "#6b7280", letterSpacing: "0.06em", textTransform: "uppercase" }}>errors</div>
                         </div>
-                        {(selDay.requests ?? 0) > 0 && (selDay.errors ?? 0) === 0 && (
-                          <div style={{ fontSize: "11px", color: "#6b7280" }}>No 5xx errors · all requests succeeded</div>
+                        {(selDay.requests ?? 0) > 0 && (
+                          <div style={{ fontSize: "11px", color: "#6b7280" }}>
+                            {selDay.status !== "healthy" && (selDay.errors ?? 0) === 0
+                              ? `Server unreachable for ~${(100 - selDay.uptime_percent).toFixed(1)}% of the day`
+                              : (selDay.errors ?? 0) === 0
+                              ? "All requests succeeded"
+                              : `${selDay.errors} requests failed (5xx)`}
+                          </div>
                         )}
                       </>}
                       {selDay.status === "no_data" && (
