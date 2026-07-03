@@ -40,6 +40,11 @@ logs/
 Thumbs.db
 desktop.ini
 
+# Next.js build output — deployed via deploy.sh, never committed
+dashboard/
+web/.next/
+web/out/
+
 # Editor
 .vscode/settings.json
 .idea/
