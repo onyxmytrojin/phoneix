@@ -54,3 +54,4 @@ async def deploy(
     asyncio.create_task(_run_deploy())
     log.info("deploy triggered by push to main")
     return {"ok": True, "status": "deploying"}
+ 
