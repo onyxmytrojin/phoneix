@@ -13,6 +13,7 @@ git fetch origin master >> "$LOG" 2>&1
 git reset --hard origin/master >> "$LOG" 2>&1
 
 chmod +x api/start_uvicorn.sh
+chmod +x cache/cache-node
 
 # update static frontend if a fresh build is included
 if [ -d "$REPO/web/out" ]; then
