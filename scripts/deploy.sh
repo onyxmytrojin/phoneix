@@ -17,3 +17,4 @@ chmod +x api/start_uvicorn.sh
 supervisorctl restart phoneix >> "$LOG" 2>&1
 
 echo "=== deploy done ===" >> "$LOG"
+# ok
