@@ -61,7 +61,7 @@ async def _full_github_fetch() -> tuple[dict, str | None]:
     async with httpx.AsyncClient(timeout=10, headers=HEADERS) as client:
         user_res, repos_res = await asyncio.gather(
             client.get(f"https://api.github.com/users/{USERNAME}"),
-            client.get(f"https://api.github.com/users/{USERNAME}/repos?sort=updated&per_page=5"),
+            client.get(f"https://api.github.com/users/{USERNAME}/repos?sort=updated&per_page=10"),
         )
 
     if user_res.status_code != 200:
@@ -71,7 +71,7 @@ async def _full_github_fetch() -> tuple[dict, str | None]:
     repos = repos_res.json() if repos_res.status_code == 200 else []
     repos_etag = repos_res.headers.get("ETag")
 
-    fetch_repos = [r for r in repos[:5] if not r.get("fork")]
+    fetch_repos = [r for r in repos[:10] if not r.get("fork")]
     commits = []
     async with httpx.AsyncClient(timeout=10, headers=HEADERS) as client:
         commit_results = await asyncio.gather(*[

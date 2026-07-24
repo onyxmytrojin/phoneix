@@ -2,8 +2,7 @@ import Image from "next/image";
 import Nav from "@/components/Nav";
 import ExperienceTabs from "@/components/ExperienceTabs";
 import HeroStatus from "@/components/HeroStatus";
-import TimeAgo from "@/components/TimeAgo";
-import { fetchGithub } from "@/lib/api";
+import GitHubActivity from "@/components/GitHubActivity";
 
 type SkillItem = { label: string; highlight?: boolean };
 
@@ -72,8 +71,7 @@ const SKILLS: Record<string, SkillItem[]> = {
   "Distributed Systems": [{ label: "Consistent Hashing", highlight: true }, { label: "Gossip Protocol", highlight: true }, { label: "Replication", highlight: true }, { label: "Structured Logging" }, { label: "Rate Limiting" }, { label: "Health Checks" }],
 };
 
-export default async function Home() {
-  const gh = await fetchGithub();
+export default function Home() {
 
   return (
     <>
@@ -147,25 +145,7 @@ export default async function Home() {
         </section>
 
         {/* ── GitHub Activity ── */}
-        {gh?.recent_commits && gh.recent_commits.length > 0 && (
-          <section style={{ paddingTop: "56px" }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px" }}>
-              <h2 style={{ fontSize: "16px", fontWeight: 700, color: "#4c8ef7" }}>GitHub Activity</h2>
-              {gh && (
-                <span style={{ fontSize: "12px", color: "#363650" }}>{gh.public_repos} repos · {gh.followers} followers</span>
-              )}
-            </div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))", gap: "8px" }}>
-              {gh.recent_commits.slice(0, 6).map((c, i) => (
-                <a key={i} href={c.url} target="_blank" rel="noreferrer" className="commit-card">
-                  <div style={{ fontSize: "10px", color: "#4c8ef7", fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: "4px" }}>{c.repo}</div>
-                  <div style={{ fontSize: "13px", color: "#e8eaf0", lineHeight: 1.5 }}>{c.message}</div>
-                  <div style={{ fontSize: "11px", color: "#363650", marginTop: "6px" }}><TimeAgo date={c.date} fallback={c.time_ago} /></div>
-                </a>
-              ))}
-            </div>
-          </section>
-        )}
+        <GitHubActivity />
 
         {/* ── Experience ── */}
         <section id="experience" style={{ paddingTop: "72px" }}>
