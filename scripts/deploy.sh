@@ -14,6 +14,12 @@ git reset --hard origin/master >> "$LOG" 2>&1
 
 chmod +x api/start_uvicorn.sh
 
+# update static frontend if a fresh build is included
+if [ -d "$REPO/web/out" ]; then
+    cp -r "$REPO/web/out/." /var/www/phoneix/dashboard/
+    echo "frontend updated" >> "$LOG"
+fi
+
 supervisorctl restart phoneix >> "$LOG" 2>&1
 
 echo "=== deploy done ===" >> "$LOG"
