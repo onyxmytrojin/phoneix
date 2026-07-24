@@ -13,3 +13,4 @@ git reset --hard origin/main >> "$LOG" 2>&1
 supervisorctl restart phoneix >> "$LOG" 2>&1
 
 echo "=== deploy done ===" >> "$LOG"
+# deploy test
