@@ -48,7 +48,7 @@ async def deploy(
         raise HTTPException(403, "invalid signature")
 
     payload = json.loads(body)
-    if payload.get("ref") != "refs/heads/main":
+    if payload.get("ref") != "refs/heads/master":
         return {"ok": True, "status": "ignored"}
 
     asyncio.create_task(_run_deploy())
