@@ -1,4 +1,3 @@
-import Image from "next/image";
 import Nav from "@/components/Nav";
 import ExperienceTabs from "@/components/ExperienceTabs";
 import HeroStatus from "@/components/HeroStatus";
@@ -89,22 +88,13 @@ export default function Home() {
           </p>
 
           <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "14px", marginBottom: "32px" }}>
-            {gh?.avatar_url && (
-              <div style={{ width: "88px", height: "88px", borderRadius: "50%", overflow: "hidden", border: "3px solid #1e2030", boxShadow: "0 0 0 4px rgba(76,142,247,0.12)" }}>
-                <Image src={gh.avatar_url} alt="Shubhan Mehrotra" width={88} height={88} style={{ objectFit: "cover" }} />
-              </div>
-            )}
+            <div style={{ width: "88px", height: "88px", borderRadius: "50%", background: "#4c8ef7", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "28px", fontWeight: 800, color: "#fff", border: "3px solid #1e2030", boxShadow: "0 0 0 4px rgba(76,142,247,0.12)" }}>SM</div>
             <div>
               <div style={{ fontWeight: 700, fontSize: "18px" }}>Shubhan Mehrotra</div>
               <div style={{ fontSize: "14px", color: "#6b7280" }}>
                 Software Engineer ·{" "}
                 <a href="https://entrupy.com" target="_blank" rel="noreferrer" style={{ fontWeight: 500 }}>Entrupy</a>
               </div>
-              {gh && (
-                <div style={{ fontSize: "12px", color: "#363650", marginTop: "4px" }}>
-                  {gh.public_repos} repos · {gh.followers} followers
-                </div>
-              )}
             </div>
           </div>
 
