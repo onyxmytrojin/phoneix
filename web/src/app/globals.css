@@ -690,8 +690,25 @@ a:hover { text-decoration: underline; text-underline-offset: 3px; }
   border: 1px solid rgba(255,255,255,0.35);
   pointer-events: none;
 }
+/* ── Mobile projects list (ProjectsBoard.tsx's MobileProjectList) ── a
+   plain upright vertical stack, hidden by default; swaps in for the
+   draggable corkboard at the same 640px breakpoint the rest of the site
+   uses for its own mobile layout, where the corkboard's fixed 3-column
+   layout has no room to work and free-dragging isn't a great touch
+   interaction anyway. */
+.projects-mobile-list { display: none; }
+.projects-mobile-card {
+  border-radius: 6px;
+  padding: 16px 18px;
+  box-shadow: 4px 8px 16px rgba(0,0,0,0.25);
+}
 @media (max-width: 640px) {
-  .sticky-board { padding-bottom: 20px; }
+  .sticky-board { display: none; }
+  .projects-mobile-list {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
 }
 
 /* ── Skill "notes" — same pinned-paper language as the Projects board,

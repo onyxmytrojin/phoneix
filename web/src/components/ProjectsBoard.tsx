@@ -148,23 +148,73 @@ function StickyNote({
   );
 }
 
+// ── Mobile version ── the desktop board's fixed 3-column percentage layout
+// has nowhere to go on a phone-width screen (each note is still ~270px
+// wide, so three of them massively overflow a ~350px board) — and free
+// dragging isn't a great fit for touch anyway. Rather than trying to make
+// the same absolute-positioned/draggable layout responsive, this is a
+// separate, simpler version: a plain upright vertical stack, no drag, no
+// rotation. Both this and the desktop board always render; CSS
+// (`.sticky-board`/`.projects-mobile-list` in globals.css) shows exactly
+// one of them per viewport width, at the same breakpoint the rest of the
+// site already uses for its mobile layout (640px).
+function MobileProjectList() {
+  return (
+    <div className="projects-mobile-list">
+      {PROJECTS.map((p, i) => (
+        <div key={p.name} className="projects-mobile-card" style={{ background: NOTE_COLORS[i % NOTE_COLORS.length] }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "6px" }}>
+            <span style={{ fontWeight: 700, fontSize: "15px", color: "#2b1a08" }}>{p.name}</span>
+            {p.badge && (
+              <span style={{
+                fontSize: "9px", color: "#fff", background: p.badge.color,
+                borderRadius: "4px", padding: "1px 6px", letterSpacing: "0.06em", fontWeight: 700,
+              }}>{p.badge.label}</span>
+            )}
+          </div>
+          <p style={{ fontSize: "12px", color: "rgba(30,18,6,0.75)", lineHeight: 1.55, marginBottom: "8px" }}>{p.desc}</p>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: "5px", marginBottom: "8px" }}>
+            {p.tags.map(t => (
+              <span key={t} style={{ fontSize: "10px", color: "#2b1a08", border: "1px solid rgba(43,26,8,0.3)", borderRadius: "3px", padding: "1px 6px" }}>{t}</span>
+            ))}
+          </div>
+          {p.links.length > 0 && (
+            <div style={{ display: "flex", gap: "14px" }}>
+              {p.links.map(l => (
+                <a key={l.label} href={l.href}
+                  target={l.href.startsWith("http") ? "_blank" : undefined}
+                  rel={l.href.startsWith("http") ? "noreferrer" : undefined}
+                  style={{ fontSize: "12px", fontWeight: 600, color: "#2b1a08", textDecoration: "underline" }}
+                >{l.label}</a>
+              ))}
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function ProjectsBoard() {
   const [order, setOrder] = useState(PROJECTS.map((_, i) => i));
   const bringToFront = (i: number) => setOrder(o => [...o.filter(x => x !== i), i]);
   const boardHeight = Math.ceil(PROJECTS.length / COLS) * ROW_HEIGHT + 40;
 
   return (
-    <div className="sticky-board" style={{ height: boardHeight }}>
-      {PROJECTS.map((p, i) => (
-        <StickyNote
-          key={p.name}
-          project={p}
-          layout={initialLayout(i)}
-          color={NOTE_COLORS[i % NOTE_COLORS.length]}
-          z={order.indexOf(i)}
-          onFocus={() => bringToFront(i)}
-        />
-      ))}
-    </div>
+    <>
+      <div className="sticky-board" style={{ height: boardHeight }}>
+        {PROJECTS.map((p, i) => (
+          <StickyNote
+            key={p.name}
+            project={p}
+            layout={initialLayout(i)}
+            color={NOTE_COLORS[i % NOTE_COLORS.length]}
+            z={order.indexOf(i)}
+            onFocus={() => bringToFront(i)}
+          />
+        ))}
+      </div>
+      <MobileProjectList />
+    </>
   );
 }
