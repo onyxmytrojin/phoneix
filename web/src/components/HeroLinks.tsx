@@ -62,7 +62,7 @@ export default function HeroLinks() {
   };
 
   return (
-    <div className="hero-links-row" style={{ display: "flex", gap: "14px", flexWrap: "wrap", marginBottom: "22px" }}>
+    <div className="hero-links-row" style={{ display: "flex", gap: "10px", flexWrap: "wrap", marginBottom: "22px" }}>
       {LINKS.map((l, i) => (
         <a
           key={l.label}

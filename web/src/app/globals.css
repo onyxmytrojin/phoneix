@@ -69,7 +69,14 @@ a:hover { text-decoration: underline; text-underline-offset: 3px; }
   gap: 8px;
   font-size: 14px; color: #fff; font-weight: 600;
   border: none;
-  border-radius: 8px; padding: 8px 20px;
+  border-radius: 8px;
+  /* Tighter horizontal padding than the original 20px — the hero's
+     compact/pre-scroll column is capped at 560px (deliberately narrow,
+     to leave room for the video on the right), and all four buttons
+     share one locked width (HeroLinks.tsx, to stop the scramble-hover
+     animation shifting layout), so a wider per-button padding pushed the
+     row past what four-across could fit and forced a 3+1 wrap. */
+  padding: 8px 14px;
   transition: filter 0.15s, transform 0.15s;
   text-decoration: none;
 }
