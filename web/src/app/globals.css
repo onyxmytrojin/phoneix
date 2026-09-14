@@ -158,17 +158,19 @@ a:hover { text-decoration: underline; text-underline-offset: 3px; }
 .commit-card {
   background: #623c14;
   border: 1px solid rgba(255,255,255,0.15);
-  border-top: 2px solid #1a2848;
+  border-top: 2px solid rgba(255,255,255,0.3);
   border-radius: 8px;
   padding: 14px 16px;
   text-decoration: none;
   color: inherit;
   display: block;
-  transition: border-top-color 0.15s, background 0.15s;
+  transition: border-top-color 0.2s ease, background 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
 }
 .commit-card:hover {
-  border-top-color: #4c8ef7;
-  background: rgba(76,142,247,0.04);
+  border-top-color: #f4a261;
+  background: rgba(255,255,255,0.05);
+  transform: translateY(-3px);
+  box-shadow: 0 12px 26px rgba(0,0,0,0.35);
   text-decoration: none;
 }
 
