@@ -703,7 +703,12 @@ a:hover { text-decoration: underline; text-underline-offset: 3px; }
   to   { opacity: 1; transform: translateY(0); }
 }
 @media (max-width: 640px) {
-  .content-panel { padding: 24px 20px; }
+  /* Section padding (24px) plus panel padding (20px) stacked on both
+     sides ate ~44px of a ~375-390px-wide screen for nothing but margin —
+     tightened here so the panel actually uses the width it has instead
+     of leaving a wide idle gutter down both edges. */
+  .scroll-section { padding: 56px 10px; }
+  .content-panel { padding: 20px 14px; }
 }
 
 /* ── Sticky-note board (Projects) ── a corkboard-style surface built from
