@@ -25,7 +25,6 @@ const WORK: Entry[] = [
     award: "🏆 Q3 Growth Mindset Award & Q4 Think Big Award",
     bullets: [
       "Architected and shipped an in-house, event-driven payment-retry engine on AWS Lambda, SQS FIFO, EventBridge, and DynamoDB — replacing a third-party dunning system with a custom policy graph supporting pause/resume, partial funds, and self-healing payment-method blacklisting.",
-      "Led its staged production rollout across 4 beta cohorts, expanding coverage ~65× from pilot to full launch.",
       "Hardened the engine against concurrent-event races: provider-event-ID dedup keys for exactly-once processing, plus DynamoDB conditional writes and consistent reads so settlement and retry events can never resurrect a resolved invoice.",
       "Designed an automated customer payment-recovery lifecycle: collection pauses when no usable payment method exists, the customer is guided to update it, and retries resume automatically once they do — or wind down through the normal policy path if they never do.",
       "Cut a customer-facing summary endpoint's cold-cache p99 by over 95% to sub-second, by rewriting per-row correlated subqueries into a parallelized two-pass query pipeline with counts recombined at the application layer — equivalence proven via SQL snapshot tests.",
