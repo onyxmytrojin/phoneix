@@ -15,22 +15,44 @@ type AvailData = { days?: AvailDay[]; summary?: { last_30_days?: number; last_90
 type RespData     = { endpoints?: Record<string, { p50?: number; count?: number }> };
 type ClusterData  = { nodes?: NodeData[]; summary?: { alive?: number; total?: number; total_keys?: number } };
 type VisitorData  = { today?: number; this_week?: number; all_time?: number };
-type ApiOut = { open: boolean; loading: boolean; data: string | null };
 
+// ── Server room palette — deliberately NOT the portfolio's warm yellow.
+// A dark navy base with three semantic status colors (green/orange/red for
+// active, degraded, failure) plus one deep-red accent for anything
+// interactive (links, buttons, the day-range toggle). Same font as the
+// portfolio (inherited from body — see globals.css), same card-hover-lift
+// animation language (.srv-card, defined there too).
+const BG          = "#050505";
+const CARD        = "#141414";
+const CARD_INNER  = "#0a0a0a";
+const BORDER      = "#262626";
+const BORDER_SOFT = "rgba(255,255,255,0.06)";
+const TEXT        = "#e8eaf0";
+const MUTED       = "#8a8a8a";
+const FAINT       = "#525252";
+const ACCENT      = "#A30000";
+const GREEN       = "#84B082";
+const ORANGE      = "#E28413";
+const RED         = "#95190C";
 
 const STATUS_COLOR = {
-  incident: "#da3633",
-  degraded: "#f59e0b",
-  no_data:  "#1a2a1a",
-  healthy:  "#39d353",
+  incident: RED,
+  degraded: ORANGE,
+  no_data:  "#1a1a1a",
+  healthy:  GREEN,
 } as const;
+
+// Dark-to-bright green tiers for the uptime heatmap (a themed replacement
+// for the old GitHub-contribution-graph greens, built from GREEN blended
+// against the near-black background).
+const GREEN_TIERS = ["#2b382b", "#4b634a", "#6b8e69", "#7ba078", GREEN];
 
 function uptimeColor(d: AvailDay) {
   if (d.status === "no_data")  return STATUS_COLOR.no_data;
   if (d.status === "incident") return STATUS_COLOR.incident;
   if (d.status === "degraded") return STATUS_COLOR.degraded;
   const p = d.uptime_percent;
-  return p === 100 ? "#39d353" : p >= 95 ? "#26a641" : p >= 80 ? "#006d32" : "#0e4429";
+  return p === 100 ? GREEN_TIERS[4] : p >= 95 ? GREEN_TIERS[3] : p >= 80 ? GREEN_TIERS[2] : GREEN_TIERS[1];
 }
 
 function buildWeekGrid(days: AvailDay[]) {
@@ -54,39 +76,12 @@ function buildWeekGrid(days: AvailDay[]) {
   return { weeks, months };
 }
 
-const API_GROUPS = [
-  { label: "CORE", items: [
-    { m: "GET",  p: "/v1/ping",    d: "Health check" },
-    { m: "GET",  p: "/v1/health",  d: "Detailed health" },
-    { m: "GET",  p: "/v1/now",     d: "Currently building" },
-  ]},
-  { label: "CACHE", items: [
-    { m: "GET",  p: "/v1/cluster",          d: "Cache cluster status" },
-    { m: "POST", p: "/v1/cluster/rebalance", d: "Trigger key rebalancing" },
-  ]},
-  { label: "SERVER", items: [
-    { m: "GET", p: "/v1/server",         d: "CPU, RAM, disk, uptime" },
-    { m: "GET", p: "/v1/metrics",        d: "Prometheus-format metrics" },
-    { m: "GET", p: "/v1/response-times", d: "Per-endpoint latency" },
-    { m: "GET", p: "/v1/availability",   d: "30-day uptime history" },
-    { m: "GET", p: "/v1/logs",           d: "Recent request log" },
-    { m: "GET", p: "/v1/visitors",       d: "Unique visitor count" },
-  ]},
-  { label: "PROFILE", items: [
-    { m: "GET", p: "/v1/cv",     d: "Resume as JSON" },
-    { m: "GET", p: "/v1/github", d: "GitHub activity" },
-    { m: "GET", p: "/v1/uses",   d: "Tools & setup" },
-    { m: "GET", p: "/v1/stack",  d: "Tech stack" },
-  ]},
-];
-
 export default function ServerPage() {
   const [srv,       setSrv]      = useState<SrvData | null>(null);
   const [avail,     setAvail]    = useState<AvailData | null>(null);
   const [resp,      setResp]     = useState<RespData | null>(null);
   const [cluster,   setCluster]  = useState<ClusterData | null>(null);
   const [logs,      setLogs]     = useState<LogEntry[]>([]);
-  const [apiOuts,   setApiOuts]  = useState<Record<string, ApiOut>>({});
   const [visitors,  setVisitors] = useState<VisitorData | null>(null);
   const [uptimeDays, setUptimeDays] = useState(90);
   const [selDay,    setSelDay]   = useState<AvailDay | null>(null);
@@ -125,23 +120,6 @@ export default function ServerPage() {
     return () => { ac.abort(); clearInterval(fi); clearInterval(si); };
   }, []);
 
-  async function tryEndpoint(path: string, method = "GET") {
-    setApiOuts(p => ({ ...p, [path]: { open: true, loading: true, data: null } }));
-    try {
-      const r = await fetch(`${API}${path}`, method === "POST" ? { method: "POST" } : {});
-      const text = await r.text();
-      let out = text;
-      try { out = JSON.stringify(JSON.parse(text), null, 2); } catch {}
-      setApiOuts(p => ({ ...p, [path]: { open: true, loading: false, data: out } }));
-    } catch {
-      setApiOuts(p => ({ ...p, [path]: { open: true, loading: false, data: "// request failed" } }));
-    }
-  }
-
-  function toggleOut(path: string) {
-    setApiOuts(p => ({ ...p, [path]: p[path] ? { ...p[path], open: !p[path].open } : { open: false, loading: false, data: null } }));
-  }
-
   const cpu      = srv?.cpu_percent ?? 0;
   const memUsed  = srv?.memory?.used_gb ?? 0;
   const memTotal = srv?.memory?.total_gb ?? 0;
@@ -163,63 +141,67 @@ export default function ServerPage() {
   );
   const maxAvg = useMemo(() => Math.max(...respRows.map(e => e.avg), 1), [respRows]);
 
+  // 3-tier status color, consistent everywhere a metric needs one: green
+  // when healthy, orange once it's elevated, red once it's critical.
+  const tier = (v: number, warn: number, crit: number) => v > crit ? RED : v > warn ? ORANGE : GREEN;
+
   const BAR = (pct: number, color: string) => (
-    <div style={{ height: "4px", background: "#1a1a28", borderRadius: "2px", overflow: "hidden", margin: "8px 0 6px" }}>
+    <div style={{ height: "4px", background: CARD_INNER, borderRadius: "2px", overflow: "hidden", margin: "8px 0 6px" }}>
       <div style={{ height: "100%", width: `${Math.min(100, pct)}%`, background: color, borderRadius: "2px", transition: "width 0.5s" }} />
     </div>
   );
 
   return (
-    <div style={{ minHeight: "100vh", background: "#060609", color: "#e8eaf0" }}>
+    <div style={{ minHeight: "100vh", background: BG, color: TEXT }}>
 
       {/* ── Nav ── */}
       <nav style={{
         position: "sticky", top: 0, zIndex: 50,
         display: "flex", alignItems: "center", justifyContent: "space-between",
         padding: "0 24px", height: "48px",
-        background: "rgba(6,6,9,0.92)", backdropFilter: "blur(10px)",
-        borderBottom: "1px solid #1a1a28", fontSize: "13px",
+        background: "rgba(5,5,5,0.92)", backdropFilter: "blur(10px)",
+        borderBottom: `1px solid ${BORDER}`, fontSize: "13px",
       }}>
-        <div style={{ display: "flex", alignItems: "center", gap: "8px", color: "#6b7280" }}>
-          <Link href="/" style={{ color: "#4c8ef7", textDecoration: "none" }}>← Shubhan Mehrotra</Link>
+        <div style={{ display: "flex", alignItems: "center", gap: "8px", color: MUTED }}>
+          <Link href="/" style={{ color: ACCENT, textDecoration: "none" }}>← Shubhan Mehrotra</Link>
           <span>/</span>
-          <span style={{ color: "#e8eaf0" }}>Server</span>
+          <span style={{ color: TEXT }}>Server</span>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
-          <Link href="/cluster" style={{ color: "#6b7280", fontSize: "12px", textDecoration: "none" }}>Cache Cluster →</Link>
-          <a href="https://api.shubhanmehrotra.com/docs" target="_blank" rel="noreferrer" style={{ color: "#4c8ef7", fontSize: "12px" }}>API Docs ↗</a>
+          <Link href="/cluster" style={{ color: MUTED, fontSize: "12px", textDecoration: "none" }}>Cache Cluster →</Link>
+          <a href="https://api.shubhanmehrotra.com/docs" target="_blank" rel="noreferrer" style={{ color: ACCENT, fontSize: "12px" }}>API Docs ↗</a>
         </div>
       </nav>
 
       {/* ── Hero ── */}
       <div style={{
-        background: "#07070d",
-        backgroundImage: "linear-gradient(rgba(76,142,247,0.025) 1px, transparent 1px), linear-gradient(90deg, rgba(76,142,247,0.025) 1px, transparent 1px)",
+        background: BG,
+        backgroundImage: "linear-gradient(rgba(255,255,255,0.025) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.025) 1px, transparent 1px)",
         backgroundSize: "32px 32px",
-        borderBottom: "1px solid #1a1a28",
+        borderBottom: `1px solid ${BORDER}`,
       }}>
         <div style={{ maxWidth: "960px", margin: "0 auto", padding: "40px 24px 36px", display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "32px", flexWrap: "wrap" }}>
           <div>
             <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "12px" }}>
-              <span style={{ display: "flex", alignItems: "center", gap: "5px", fontSize: "12px", color: "#22c55e", background: "rgba(34,197,94,0.1)", border: "1px solid rgba(34,197,94,0.25)", borderRadius: "20px", padding: "3px 10px", fontWeight: 600 }}>
-                <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: "#22c55e", boxShadow: "0 0 6px #22c55e" }} /> Live
+              <span style={{ display: "flex", alignItems: "center", gap: "5px", fontSize: "12px", color: GREEN, background: "rgba(132,176,130,0.1)", border: "1px solid rgba(132,176,130,0.3)", borderRadius: "20px", padding: "3px 10px", fontWeight: 600 }}>
+                <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: GREEN, boxShadow: `0 0 6px ${GREEN}` }} /> Live
               </span>
-              <span style={{ fontSize: "13px", color: "#6b7280" }}>Bangalore, India</span>
+              <span style={{ fontSize: "13px", color: MUTED }}>Bangalore, India</span>
             </div>
             <h1 style={{ fontSize: "clamp(26px,5vw,40px)", fontWeight: 800, lineHeight: 1.1, marginBottom: "10px", letterSpacing: "-0.02em" }}>
-              Phoneix <span style={{ color: "#4c8ef7" }}>Server</span>
+              Phoneix <span style={{ color: ACCENT }}>Server</span>
             </h1>
-            <p style={{ fontSize: "13px", color: "#4c8ef7", marginBottom: "10px", fontFamily: "var(--font-geist-mono), monospace" }}>
+            <p style={{ fontSize: "13px", color: ACCENT, marginBottom: "10px", fontFamily: "var(--font-geist-mono), monospace" }}>
               Google Pixel 7a · ARM64 · Debian (proot) · GrapheneOS
             </p>
-            <p style={{ fontSize: "14px", color: "#6b7280", maxWidth: "420px", lineHeight: 1.65 }}>
+            <p style={{ fontSize: "14px", color: MUTED, maxWidth: "420px", lineHeight: 1.65 }}>
               This page is served from a phone in my room. Every number below is pulled live from the hardware running it.
             </p>
           </div>
-          <div style={{ background: "#0d0d14", border: "1px solid #1a1a28", borderRadius: "10px", padding: "20px 28px", textAlign: "center", flexShrink: 0 }}>
-            <div style={{ fontSize: "10px", color: "#6b7280", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "8px" }}>Uptime</div>
+          <div className="srv-card" style={{ background: CARD, border: `1px solid ${BORDER}`, borderRadius: "10px", padding: "20px 28px", textAlign: "center", flexShrink: 0 }}>
+            <div style={{ fontSize: "10px", color: MUTED, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "8px" }}>Uptime</div>
             <div style={{ fontSize: "32px", fontWeight: 800, lineHeight: 1 }}>{srv?.uptime_human ?? "—"}</div>
-            <div style={{ fontSize: "11px", color: "#363650", marginTop: "8px" }}>since last restart</div>
+            <div style={{ fontSize: "11px", color: FAINT, marginTop: "8px" }}>since last restart</div>
           </div>
         </div>
       </div>
@@ -230,54 +212,54 @@ export default function ServerPage() {
         {/* Stats row */}
         <div className="stats-grid">
           {/* CPU */}
-          <div style={{ background: "#0d0d14", border: "1px solid #1a1a28", borderRadius: "10px", padding: "16px 18px" }}>
-            <div style={{ fontSize: "11px", color: "#6b7280", letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: "6px" }}>CPU</div>
+          <div className="srv-card" style={{ background: CARD, border: `1px solid ${BORDER}`, borderRadius: "10px", padding: "16px 18px" }}>
+            <div style={{ fontSize: "11px", color: MUTED, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: "6px" }}>CPU</div>
             <div style={{ fontSize: "28px", fontWeight: 800, lineHeight: 1.1 }}>{cpu.toFixed(1)}%</div>
-            {BAR(cpu, cpu > 85 ? "#ef4444" : cpu > 65 ? "#f59e0b" : "#4c8ef7")}
-            <div style={{ fontSize: "11px", color: "#363650" }}>sched_pixel · load/freq blend</div>
+            {BAR(cpu, tier(cpu, 65, 85))}
+            <div style={{ fontSize: "11px", color: FAINT }}>sched_pixel · load/freq blend</div>
           </div>
           {/* Memory */}
-          <div style={{ background: "#0d0d14", border: "1px solid #1a1a28", borderRadius: "10px", padding: "16px 18px" }}>
-            <div style={{ fontSize: "11px", color: "#6b7280", letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: "6px" }}>Memory</div>
+          <div className="srv-card" style={{ background: CARD, border: `1px solid ${BORDER}`, borderRadius: "10px", padding: "16px 18px" }}>
+            <div style={{ fontSize: "11px", color: MUTED, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: "6px" }}>Memory</div>
             <div style={{ fontSize: "28px", fontWeight: 800, lineHeight: 1.1 }}>{memUsed.toFixed(1)} GB</div>
-            {BAR(memPct, memPct > 85 ? "#ef4444" : "#f59e0b")}
-            <div style={{ fontSize: "11px", color: "#363650" }}>of {memTotal.toFixed(1)} GB</div>
+            {BAR(memPct, tier(memPct, 65, 85))}
+            <div style={{ fontSize: "11px", color: FAINT }}>of {memTotal.toFixed(1)} GB</div>
           </div>
           {/* Disk */}
-          <div style={{ background: "#0d0d14", border: "1px solid #1a1a28", borderRadius: "10px", padding: "16px 18px" }}>
-            <div style={{ fontSize: "11px", color: "#6b7280", letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: "6px" }}>Disk Free</div>
+          <div className="srv-card" style={{ background: CARD, border: `1px solid ${BORDER}`, borderRadius: "10px", padding: "16px 18px" }}>
+            <div style={{ fontSize: "11px", color: MUTED, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: "6px" }}>Disk Free</div>
             <div style={{ fontSize: "28px", fontWeight: 800, lineHeight: 1.1 }}>{diskFree.toFixed(0)} GB</div>
-            {BAR(diskPct, diskPct > 85 ? "#ef4444" : "#22c55e")}
-            <div style={{ fontSize: "11px", color: "#363650" }}>of {diskTot.toFixed(0)} GB total</div>
+            {BAR(diskPct, tier(diskPct, 65, 85))}
+            <div style={{ fontSize: "11px", color: FAINT }}>of {diskTot.toFixed(0)} GB total</div>
           </div>
           {/* Load */}
-          <div style={{ background: "#0d0d14", border: "1px solid #1a1a28", borderRadius: "10px", padding: "16px 18px" }}>
-            <div style={{ fontSize: "11px", color: "#6b7280", letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: "6px" }}>Load Avg</div>
+          <div className="srv-card" style={{ background: CARD, border: `1px solid ${BORDER}`, borderRadius: "10px", padding: "16px 18px" }}>
+            <div style={{ fontSize: "11px", color: MUTED, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: "6px" }}>Load Avg</div>
             <div style={{ fontSize: "28px", fontWeight: 800, lineHeight: 1.1 }}>{(load[0] ?? 0).toFixed(2)}</div>
             <div style={{ display: "flex", gap: "6px", marginTop: "16px" }}>
               {load.slice(0, 3).map((v, i) => (
-                <span key={i} style={{ fontSize: "11px", color: "#6b7280", background: "#1a1a28", borderRadius: "4px", padding: "2px 6px", fontFamily: "var(--font-geist-mono), monospace", fontVariantNumeric: "tabular-nums" }}>{(v ?? 0).toFixed(2)}</span>
+                <span key={i} style={{ fontSize: "11px", color: MUTED, background: CARD_INNER, borderRadius: "4px", padding: "2px 6px", fontFamily: "var(--font-geist-mono), monospace", fontVariantNumeric: "tabular-nums" }}>{(v ?? 0).toFixed(2)}</span>
               ))}
             </div>
           </div>
           {/* Visitors */}
-          <div style={{ background: "#0d0d14", border: "1px solid #1a1a28", borderRadius: "10px", padding: "16px 18px" }}>
-            <div style={{ fontSize: "11px", color: "#6b7280", letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: "6px" }}>Visitors</div>
+          <div className="srv-card" style={{ background: CARD, border: `1px solid ${BORDER}`, borderRadius: "10px", padding: "16px 18px" }}>
+            <div style={{ fontSize: "11px", color: MUTED, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: "6px" }}>Visitors</div>
             <div style={{ fontSize: "28px", fontWeight: 800, lineHeight: 1.1 }}>{visitors?.today ?? "—"}</div>
             <div style={{ display: "flex", gap: "6px", marginTop: "8px", flexWrap: "wrap" }}>
               {visitors && <>
-                <span style={{ fontSize: "10px", color: "#6b7280", background: "#1a1a28", borderRadius: "4px", padding: "2px 6px", fontVariantNumeric: "tabular-nums" }}>{visitors.this_week} wk</span>
-                <span style={{ fontSize: "10px", color: "#6b7280", background: "#1a1a28", borderRadius: "4px", padding: "2px 6px", fontVariantNumeric: "tabular-nums" }}>{visitors.all_time} total</span>
+                <span style={{ fontSize: "10px", color: MUTED, background: CARD_INNER, borderRadius: "4px", padding: "2px 6px", fontVariantNumeric: "tabular-nums" }}>{visitors.this_week} wk</span>
+                <span style={{ fontSize: "10px", color: MUTED, background: CARD_INNER, borderRadius: "4px", padding: "2px 6px", fontVariantNumeric: "tabular-nums" }}>{visitors.all_time} total</span>
               </>}
             </div>
-            <div style={{ fontSize: "11px", color: "#363650", marginTop: "4px" }}>unique IPs today</div>
+            <div style={{ fontSize: "11px", color: FAINT, marginTop: "4px" }}>unique IPs today</div>
           </div>
         </div>
 
         {/* Two-column: uptime | response times */}
         <div className="split-grid">
           {/* 30-day uptime */}
-          <div style={{ background: "#0d0d14", border: "1px solid #1a1a28", borderRadius: "10px", padding: "18px 20px" }}>
+          <div className="srv-card" style={{ background: CARD, border: `1px solid ${BORDER}`, borderRadius: "10px", padding: "18px 20px" }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px" }}>
               <span style={{ fontSize: "13px", fontWeight: 600 }}>{uptimeDays}-Day Uptime</span>
               <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
@@ -286,14 +268,14 @@ export default function ServerPage() {
                     <button key={d} onClick={() => { setUptimeDays(d); setSelDay(null); }} style={{
                       padding: "2px 8px", fontSize: "10px", borderRadius: "4px", border: "none",
                       cursor: "pointer", fontFamily: "inherit", letterSpacing: "0.04em",
-                      background: uptimeDays === d ? "#4c8ef7" : "#1a1a28",
-                      color: uptimeDays === d ? "#fff" : "#6b7280",
+                      background: uptimeDays === d ? ACCENT : CARD_INNER,
+                      color: uptimeDays === d ? "#fff" : MUTED,
                       transition: "background 0.15s",
                     }}>{d}d</button>
                   ))}
                 </div>
                 {(avail?.summary?.last_90_days ?? avail?.summary?.last_30_days) != null && (
-                  <span style={{ fontSize: "11px", color: "#22c55e", background: "rgba(34,197,94,0.1)", border: "1px solid rgba(34,197,94,0.2)", borderRadius: "4px", padding: "2px 8px" }}>
+                  <span style={{ fontSize: "11px", color: GREEN, background: "rgba(132,176,130,0.1)", border: "1px solid rgba(132,176,130,0.25)", borderRadius: "4px", padding: "2px 8px" }}>
                     {avail!.summary!.last_90_days ?? avail!.summary!.last_30_days}% avg
                   </span>
                 )}
@@ -305,20 +287,20 @@ export default function ServerPage() {
               const { weeks, months } = buildWeekGrid(gridDays);
               const SZ = 10, GAP = 3;
               const statusLabel = (d: AvailDay) => d.status === "no_data" ? "No data" : d.status.charAt(0).toUpperCase() + d.status.slice(1);
-              const statusColor = (d: AvailDay) => d.status === "no_data" ? "#6b7280" : STATUS_COLOR[d.status as keyof typeof STATUS_COLOR] ?? "#22c55e";
+              const statusColor = (d: AvailDay) => d.status === "no_data" ? MUTED : STATUS_COLOR[d.status as keyof typeof STATUS_COLOR] ?? GREEN;
               return (
                 <div style={{ overflowX: "auto" }}>
                   {/* Month labels */}
                   <div style={{ display: "flex", marginLeft: "20px", marginBottom: "4px", position: "relative", height: "13px" }}>
                     {months.map(m => (
-                      <div key={m.col} style={{ position: "absolute", left: `${m.col * (SZ + GAP)}px`, fontSize: "9px", color: "#6b7280", whiteSpace: "nowrap", letterSpacing: "0.04em" }}>{m.label}</div>
+                      <div key={m.col} style={{ position: "absolute", left: `${m.col * (SZ + GAP)}px`, fontSize: "9px", color: MUTED, whiteSpace: "nowrap", letterSpacing: "0.04em" }}>{m.label}</div>
                     ))}
                   </div>
                   <div style={{ display: "flex", gap: `${GAP}px` }}>
                     {/* Day-of-week labels */}
                     <div style={{ display: "flex", flexDirection: "column", gap: `${GAP}px`, paddingTop: "1px" }}>
                       {["","M","","W","","F",""].map((l, i) => (
-                        <div key={i} style={{ width: "13px", height: `${SZ}px`, fontSize: "9px", color: "#6b7280", lineHeight: `${SZ}px`, textAlign: "right" }}>{l}</div>
+                        <div key={i} style={{ width: "13px", height: `${SZ}px`, fontSize: "9px", color: MUTED, lineHeight: `${SZ}px`, textAlign: "right" }}>{l}</div>
                       ))}
                     </div>
                     {/* Week columns */}
@@ -331,7 +313,7 @@ export default function ServerPage() {
                               width: `${SZ}px`, height: `${SZ}px`, borderRadius: "2px",
                               background: day ? uptimeColor(day) : "transparent",
                               cursor: day ? "pointer" : "default",
-                              outline: day && selDay?.date === day.date ? "2px solid #e8eaf0" : "none",
+                              outline: day && selDay?.date === day.date ? `2px solid ${TEXT}` : "none",
                               outlineOffset: "1px",
                             }} />
                         ))}
@@ -341,7 +323,7 @@ export default function ServerPage() {
 
                   {/* Selected day popover */}
                   {selDay && (
-                    <div style={{ marginTop: "10px", padding: "10px 14px", background: "#0a0a12", border: `1px solid ${statusColor(selDay)}40`, borderLeft: `3px solid ${statusColor(selDay)}`, borderRadius: "6px", fontSize: "12px", display: "flex", flexWrap: "wrap", gap: "14px", alignItems: "center" }}>
+                    <div style={{ marginTop: "10px", padding: "10px 14px", background: CARD_INNER, border: `1px solid ${statusColor(selDay)}40`, borderLeft: `3px solid ${statusColor(selDay)}`, borderRadius: "6px", fontSize: "12px", display: "flex", flexWrap: "wrap", gap: "14px", alignItems: "center" }}>
                       <div>
                         <div style={{ fontWeight: 600, marginBottom: "2px" }}>{new Date(selDay.date + "T12:00:00Z").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" })}</div>
                         <div style={{ display: "flex", alignItems: "center", gap: "5px", fontSize: "11px" }}>
@@ -351,19 +333,19 @@ export default function ServerPage() {
                       </div>
                       {selDay.status !== "no_data" && <>
                         <div style={{ textAlign: "center" }}>
-                          <div style={{ fontSize: "18px", fontWeight: 700, color: "#e8eaf0", lineHeight: 1 }}>{selDay.uptime_percent}%</div>
-                          <div style={{ fontSize: "10px", color: "#6b7280", letterSpacing: "0.06em", textTransform: "uppercase" }}>uptime</div>
+                          <div style={{ fontSize: "18px", fontWeight: 700, color: TEXT, lineHeight: 1 }}>{selDay.uptime_percent}%</div>
+                          <div style={{ fontSize: "10px", color: MUTED, letterSpacing: "0.06em", textTransform: "uppercase" }}>uptime</div>
                         </div>
                         <div style={{ textAlign: "center" }}>
-                          <div style={{ fontSize: "18px", fontWeight: 700, color: "#e8eaf0", lineHeight: 1 }}>{(selDay.requests ?? 0).toLocaleString()}</div>
-                          <div style={{ fontSize: "10px", color: "#6b7280", letterSpacing: "0.06em", textTransform: "uppercase" }}>requests</div>
+                          <div style={{ fontSize: "18px", fontWeight: 700, color: TEXT, lineHeight: 1 }}>{(selDay.requests ?? 0).toLocaleString()}</div>
+                          <div style={{ fontSize: "10px", color: MUTED, letterSpacing: "0.06em", textTransform: "uppercase" }}>requests</div>
                         </div>
                         <div style={{ textAlign: "center" }}>
-                          <div style={{ fontSize: "18px", fontWeight: 700, color: (selDay.errors ?? 0) > 0 ? "#da3633" : "#e8eaf0", lineHeight: 1 }}>{(selDay.errors ?? 0).toLocaleString()}</div>
-                          <div style={{ fontSize: "10px", color: "#6b7280", letterSpacing: "0.06em", textTransform: "uppercase" }}>errors</div>
+                          <div style={{ fontSize: "18px", fontWeight: 700, color: (selDay.errors ?? 0) > 0 ? RED : TEXT, lineHeight: 1 }}>{(selDay.errors ?? 0).toLocaleString()}</div>
+                          <div style={{ fontSize: "10px", color: MUTED, letterSpacing: "0.06em", textTransform: "uppercase" }}>errors</div>
                         </div>
                         {(selDay.requests ?? 0) > 0 && (
-                          <div style={{ fontSize: "11px", color: "#6b7280" }}>
+                          <div style={{ fontSize: "11px", color: MUTED }}>
                             {selDay.status !== "healthy" && (selDay.errors ?? 0) === 0
                               ? `Server unreachable for ~${(100 - selDay.uptime_percent).toFixed(1)}% of the day`
                               : (selDay.errors ?? 0) === 0
@@ -373,16 +355,16 @@ export default function ServerPage() {
                         )}
                       </>}
                       {selDay.status === "no_data" && (
-                        <div style={{ fontSize: "11px", color: "#6b7280" }}>Server was not running or no requests recorded on this day.</div>
+                        <div style={{ fontSize: "11px", color: MUTED }}>Server was not running or no requests recorded on this day.</div>
                       )}
                     </div>
                   )}
 
                   {/* Legend */}
-                  <div style={{ display: "flex", alignItems: "center", gap: "6px", marginTop: "10px", fontSize: "10px", color: "#6b7280" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "6px", marginTop: "10px", fontSize: "10px", color: MUTED }}>
                     <span>Less</span>
-                    {(["#1a2a1a","#0e4429","#006d32","#26a641","#39d353"] as string[]).map(c => (
-                      <div key={c} style={{ width: `${SZ}px`, height: `${SZ}px`, borderRadius: "2px", background: c, flexShrink: 0 }} />
+                    {[STATUS_COLOR.no_data, ...GREEN_TIERS.slice(0, 4)].map((c, i) => (
+                      <div key={i} style={{ width: `${SZ}px`, height: `${SZ}px`, borderRadius: "2px", background: c, flexShrink: 0 }} />
                     ))}
                     <span>More</span>
                     <span style={{ marginLeft: "8px", display: "flex", alignItems: "center", gap: "4px" }}>
@@ -398,47 +380,47 @@ export default function ServerPage() {
           </div>
 
           {/* Response times */}
-          <div style={{ background: "#0d0d14", border: "1px solid #1a1a28", borderRadius: "10px", padding: "18px 20px" }}>
+          <div className="srv-card" style={{ background: CARD, border: `1px solid ${BORDER}`, borderRadius: "10px", padding: "18px 20px" }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px" }}>
               <span style={{ fontSize: "13px", fontWeight: 600 }}>Response Times</span>
-              <span style={{ fontSize: "11px", color: "#363650" }}>avg ms per endpoint</span>
+              <span style={{ fontSize: "11px", color: FAINT }}>avg ms per endpoint</span>
             </div>
             {respRows.length > 0 ? (
               <div style={{ display: "flex", flexDirection: "column", gap: "7px" }}>
                 {respRows.map(e => {
                   const barPct = Math.max(1, Math.min(100, (e.avg / maxAvg) * 100));
-                  const barColor = e.avg > 500 ? "#ef4444" : e.avg > 150 ? "#f59e0b" : "#4c8ef7";
+                  const barColor = tier(e.avg, 150, 500);
                   return (
                     <div key={e.path} style={{ display: "grid", gridTemplateColumns: "130px 1fr 52px 42px", gap: "8px", alignItems: "center" }}>
                       <div style={{ display: "flex", alignItems: "center", gap: "5px", minWidth: 0 }}>
                         <span style={{ width: "5px", height: "5px", borderRadius: "50%", background: barColor, flexShrink: 0 }} />
-                        <code style={{ fontSize: "10px", color: "#6b7280", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{e.path}</code>
+                        <code style={{ fontSize: "10px", color: MUTED, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{e.path}</code>
                       </div>
-                      <div style={{ height: "4px", background: "#1a1a28", borderRadius: "2px", overflow: "hidden" }}>
+                      <div style={{ height: "4px", background: CARD_INNER, borderRadius: "2px", overflow: "hidden" }}>
                         <div style={{ height: "100%", width: `${barPct}%`, background: barColor, borderRadius: "2px", transition: "width 0.4s" }} />
                       </div>
-                      <span style={{ color: "#e8eaf0", fontSize: "11px", fontVariantNumeric: "tabular-nums", textAlign: "right" }}>{e.avg.toFixed(0)}ms</span>
-                      <span style={{ color: "#363650", fontSize: "10px", fontVariantNumeric: "tabular-nums", textAlign: "right" }}>{e.count.toLocaleString()}</span>
+                      <span style={{ color: TEXT, fontSize: "11px", fontVariantNumeric: "tabular-nums", textAlign: "right" }}>{e.avg.toFixed(0)}ms</span>
+                      <span style={{ color: FAINT, fontSize: "10px", fontVariantNumeric: "tabular-nums", textAlign: "right" }}>{e.count.toLocaleString()}</span>
                     </div>
                   );
                 })}
               </div>
             ) : (
-              <div style={{ color: "#363650", fontSize: "12px" }}>No data yet.</div>
+              <div style={{ color: FAINT, fontSize: "12px" }}>No data yet.</div>
             )}
           </div>
         </div>
 
         {/* Cache cluster mini */}
-        <div style={{ background: "#0d0d14", border: "1px solid #1a1a28", borderRadius: "10px", padding: "18px 20px" }}>
+        <div className="srv-card" style={{ background: CARD, border: `1px solid ${BORDER}`, borderRadius: "10px", padding: "18px 20px" }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "14px" }}>
             <span style={{ fontSize: "13px", fontWeight: 600 }}>Cache Cluster</span>
-            <Link href="/cluster" style={{ fontSize: "12px", color: "#4c8ef7" }}>Full view ↗</Link>
+            <Link href="/cluster" style={{ fontSize: "12px", color: ACCENT }}>Full view ↗</Link>
           </div>
           {cluster ? (
             <>
-              <div style={{ display: "flex", gap: "16px", fontSize: "13px", color: "#6b7280", marginBottom: "14px", flexWrap: "wrap" }}>
-                <span style={{ color: (cluster.summary?.alive ?? 0) === (cluster.summary?.total ?? 0) ? "#22c55e" : "#f59e0b" }}>
+              <div style={{ display: "flex", gap: "16px", fontSize: "13px", color: MUTED, marginBottom: "14px", flexWrap: "wrap" }}>
+                <span style={{ color: (cluster.summary?.alive ?? 0) === (cluster.summary?.total ?? 0) ? GREEN : ORANGE }}>
                   {cluster.summary?.alive ?? "?"}/{cluster.summary?.total ?? "?"} nodes alive
                 </span>
                 <span>{cluster.summary?.total_keys ?? 0} keys cached</span>
@@ -451,14 +433,14 @@ export default function ServerPage() {
                   const reqs = n.requests_total;
                   const rps = reqs != null && n.uptime_seconds ? ((reqs / n.uptime_seconds) * 60).toFixed(1) : null;
                   return (
-                    <div key={id} style={{ background: "#08080e", border: "1px solid #1a1a28", borderRadius: "8px", padding: "12px 14px" }}>
+                    <div key={id} className="srv-card" style={{ background: CARD_INNER, border: `1px solid ${BORDER}`, borderRadius: "8px", padding: "12px 14px" }}>
                       <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "8px" }}>
-                        <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: alive ? "#22c55e" : "#ef4444", boxShadow: alive ? "0 0 5px #22c55e" : "none" }} />
+                        <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: alive ? GREEN : RED, boxShadow: alive ? `0 0 5px ${GREEN}` : "none" }} />
                         <span style={{ fontSize: "12px", fontWeight: 600, fontFamily: "var(--font-geist-mono),monospace" }}>{id}{n.port ? `:${n.port}` : ""}</span>
                       </div>
                       <div style={{ fontSize: "24px", fontWeight: 800, lineHeight: 1 }}>{n.keys_held ?? "—"}</div>
-                      <div style={{ fontSize: "10px", color: "#6b7280", marginBottom: "8px" }}>keys cached</div>
-                      <div style={{ fontSize: "11px", color: "#363650", display: "flex", flexWrap: "wrap", gap: "4px" }}>
+                      <div style={{ fontSize: "10px", color: MUTED, marginBottom: "8px" }}>keys cached</div>
+                      <div style={{ fontSize: "11px", color: FAINT, display: "flex", flexWrap: "wrap", gap: "4px" }}>
                         {n.uptime_seconds != null && <span>up {fmtUp(n.uptime_seconds)}</span>}
                         {reqs != null && <span>· {reqs.toLocaleString()} reqs</span>}
                         {rps && <span>· {rps}/min</span>}
@@ -467,8 +449,8 @@ export default function ServerPage() {
                         <div style={{ marginTop: "8px", display: "flex", flexDirection: "column", gap: "3px" }}>
                           {Object.entries(n.peer_states).map(([pid, pst]) => (
                             <div key={pid} style={{ display: "flex", justifyContent: "space-between", fontSize: "10px" }}>
-                              <span style={{ color: "#6b7280" }}>{pid}</span>
-                              <span style={{ color: pst === "alive" ? "#22c55e" : "#ef4444", textTransform: "uppercase", letterSpacing: "0.04em" }}>{pst}</span>
+                              <span style={{ color: MUTED }}>{pid}</span>
+                              <span style={{ color: pst === "alive" ? GREEN : RED, textTransform: "uppercase", letterSpacing: "0.04em" }}>{pst}</span>
                             </div>
                           ))}
                         </div>
@@ -479,110 +461,46 @@ export default function ServerPage() {
               </div>
             </>
           ) : (
-            <div style={{ color: "#363650", fontSize: "12px" }}>Loading…</div>
+            <div style={{ color: FAINT, fontSize: "12px" }}>Loading…</div>
           )}
         </div>
 
         {/* Live Requests */}
-        <div style={{ background: "#0d0d14", border: "1px solid #1a1a28", borderRadius: "10px", overflow: "hidden" }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 20px", borderBottom: "1px solid #1a1a28" }}>
+        <div className="srv-card" style={{ background: CARD, border: `1px solid ${BORDER}`, borderRadius: "10px", overflow: "hidden" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 20px", borderBottom: `1px solid ${BORDER}` }}>
             <span style={{ fontSize: "13px", fontWeight: 600 }}>Live Requests</span>
-            <span style={{ display: "flex", alignItems: "center", gap: "5px", fontSize: "11px", color: "#22c55e", background: "rgba(34,197,94,0.1)", border: "1px solid rgba(34,197,94,0.2)", borderRadius: "20px", padding: "2px 10px" }}>
-              <span style={{ width: "5px", height: "5px", borderRadius: "50%", background: "#22c55e", boxShadow: "0 0 5px #22c55e" }} /> streaming
+            <span style={{ display: "flex", alignItems: "center", gap: "5px", fontSize: "11px", color: GREEN, background: "rgba(132,176,130,0.1)", border: "1px solid rgba(132,176,130,0.25)", borderRadius: "20px", padding: "2px 10px" }}>
+              <span style={{ width: "5px", height: "5px", borderRadius: "50%", background: GREEN, boxShadow: `0 0 5px ${GREEN}` }} /> streaming
             </span>
           </div>
           <div style={{ overflowX: "auto" }}>
-            <div style={{ display: "grid", gridTemplateColumns: "70px 1fr 60px 70px 80px", padding: "8px 20px", fontSize: "10px", color: "#363650", letterSpacing: "0.08em", textTransform: "uppercase", borderBottom: "1px solid #0f0f1a" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "70px 1fr 60px 70px 80px", padding: "8px 20px", fontSize: "10px", color: FAINT, letterSpacing: "0.08em", textTransform: "uppercase", borderBottom: `1px solid ${BORDER_SOFT}` }}>
               <span>Method</span><span>Path</span><span>Status</span><span>Time</span><span>When</span>
             </div>
             {logs.length === 0 ? (
-              <div style={{ padding: "20px", fontSize: "12px", color: "#363650", fontStyle: "italic" }}>Waiting for requests…</div>
+              <div style={{ padding: "20px", fontSize: "12px", color: FAINT, fontStyle: "italic" }}>Waiting for requests…</div>
             ) : logs.map((r, i) => {
               const s = r.status ?? 0;
-              const sCol = s < 400 ? "#22c55e" : s < 500 ? "#f59e0b" : "#ef4444";
-              const mCol = r.method === "POST" ? "#a855f7" : "#4c8ef7";
+              const sCol = s < 400 ? GREEN : s < 500 ? ORANGE : RED;
+              const mCol = r.method === "POST" ? ORANGE : GREEN;
               return (
-                <div key={i} className="log-row" style={{ display: "grid", gridTemplateColumns: "70px 1fr 60px 70px 80px", padding: "9px 20px", borderBottom: "1px solid #0a0a14", fontSize: "12px" }}>
+                <div key={i} className="log-row" style={{ display: "grid", gridTemplateColumns: "70px 1fr 60px 70px 80px", padding: "9px 20px", borderBottom: `1px solid ${BORDER_SOFT}`, fontSize: "12px" }}>
                   <span style={{ color: mCol, fontFamily: "var(--font-geist-mono),monospace", fontWeight: 600 }}>{r.method ?? "GET"}</span>
-                  <code style={{ color: "#9aa3b8", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontFamily: "var(--font-geist-mono),monospace" }}>{r.path ?? "—"}</code>
+                  <code style={{ color: MUTED, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontFamily: "var(--font-geist-mono),monospace" }}>{r.path ?? "—"}</code>
                   <span style={{ color: sCol, fontFamily: "var(--font-geist-mono),monospace" }}>{s}</span>
-                  <span className="log-col-time" style={{ color: "#6b7280" }}>{r.duration_ms != null ? `${r.duration_ms.toFixed(0)}ms` : "—"}</span>
-                  <span className="log-col-when" style={{ color: "#363650" }}>{r.timestamp ? timeAgo(r.timestamp) : "—"}</span>
+                  <span className="log-col-time" style={{ color: MUTED }}>{r.duration_ms != null ? `${r.duration_ms.toFixed(0)}ms` : "—"}</span>
+                  <span className="log-col-when" style={{ color: FAINT }}>{r.timestamp ? timeAgo(r.timestamp) : "—"}</span>
                 </div>
               );
             })}
           </div>
         </div>
 
-        {/* API Explorer */}
-        <div style={{ background: "#0d0d14", border: "1px solid #1a1a28", borderRadius: "10px", overflow: "hidden" }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 20px", borderBottom: "1px solid #1a1a28" }}>
-            <span style={{ fontSize: "13px", fontWeight: 600 }}>API Explorer</span>
-            <a href="https://api.shubhanmehrotra.com/docs" target="_blank" rel="noreferrer" style={{ fontSize: "12px", color: "#4c8ef7" }}>Swagger ↗</a>
-          </div>
-          <div style={{ padding: "16px 20px" }}>
-            <p style={{ fontSize: "12px", color: "#6b7280", marginBottom: "20px" }}>
-              Fire live requests against <code style={{ color: "#4c8ef7", fontFamily: "var(--font-geist-mono),monospace" }}>api.shubhanmehrotra.com</code> — responses come directly from the Pixel 7a.
-            </p>
-            <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
-              {API_GROUPS.map(group => (
-                <div key={group.label}>
-                  <div style={{ fontSize: "10px", color: "#363650", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "10px", fontWeight: 600 }}>{group.label}</div>
-                  <div style={{ background: "#07070d", border: "1px solid #1a1a28", borderRadius: "8px", overflow: "hidden" }}>
-                    {group.items.map((ep, idx) => {
-                      const out = apiOuts[ep.p];
-                      const isGet = ep.m === "GET";
-                      return (
-                        <div key={ep.p} style={{ borderBottom: idx < group.items.length - 1 ? "1px solid #1a1a28" : "none" }}>
-                          <div style={{
-                            display: "grid", gridTemplateColumns: "60px 200px 1fr auto",
-                            alignItems: "center", padding: "10px 14px", gap: "12px",
-                            cursor: "pointer", background: out?.open ? "rgba(76,142,247,0.04)" : "transparent",
-                            transition: "background 0.1s",
-                          }} onClick={() => out?.open && toggleOut(ep.p)}>
-                            <span style={{
-                              fontSize: "10px", fontWeight: 700,
-                              fontFamily: "var(--font-geist-mono),monospace",
-                              color: isGet ? "#22c55e" : "#a855f7",
-                              background: isGet ? "rgba(34,197,94,0.1)" : "rgba(168,85,247,0.1)",
-                              border: isGet ? "1px solid rgba(34,197,94,0.25)" : "1px solid rgba(168,85,247,0.25)",
-                              borderRadius: "4px", padding: "2px 6px", textAlign: "center",
-                            }}>{ep.m}</span>
-                            <code style={{ fontSize: "12px", color: "#e8eaf0", fontFamily: "var(--font-geist-mono),monospace" }}>{ep.p}</code>
-                            <span style={{ fontSize: "12px", color: "#6b7280" }}>{ep.d}</span>
-                            <button
-                              onClick={e => { e.stopPropagation(); tryEndpoint(ep.p, ep.m); }}
-                              style={{
-                                padding: "5px 16px", fontSize: "11px", fontWeight: 600,
-                                background: "#4c8ef7", color: "#fff", border: "none",
-                                borderRadius: "6px", cursor: "pointer", letterSpacing: "0.02em",
-                              }}
-                            >{out?.loading ? "…" : "Try"}</button>
-                          </div>
-                          {out?.open && out.data !== null && (
-                            <pre style={{
-                              background: "#030306", borderTop: "1px solid #1a1a28",
-                              padding: "12px 16px", fontSize: "11px", color: "#9aa3b8",
-                              maxHeight: "260px", overflow: "auto",
-                              fontFamily: "var(--font-geist-mono),monospace", lineHeight: 1.65,
-                              whiteSpace: "pre-wrap", wordBreak: "break-all", margin: 0,
-                            }}>{out.data}</pre>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-
         {/* Footer */}
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "16px 0", fontSize: "12px", color: "#363650", borderTop: "1px solid #1a1a28", marginTop: "8px" }}>
-          <Link href="/" style={{ color: "#6b7280", textDecoration: "none" }}>← Portfolio</Link>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "16px 0", fontSize: "12px", color: FAINT, borderTop: `1px solid ${BORDER}`, marginTop: "8px" }}>
+          <Link href="/" style={{ color: MUTED, textDecoration: "none" }}>← Portfolio</Link>
           <span>Phoneix · api.shubhanmehrotra.com</span>
-          <Link href="/cluster" style={{ color: "#6b7280", textDecoration: "none" }}>Cache Cluster →</Link>
+          <Link href="/cluster" style={{ color: MUTED, textDecoration: "none" }}>Cache Cluster →</Link>
         </div>
 
       </div>

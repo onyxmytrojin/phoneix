@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 
 type Entry = {
   org: string;
@@ -123,48 +123,26 @@ function OrgCircle({ initial, color }: { initial: string; color: string }) {
 function ExperienceCard({ item }: { item: Entry }) {
   const isSimple = item.bullets.length === 0;
   return (
-    <div style={{
-      background: "#0d0d14",
-      border: "1px solid #1a1a28",
-      borderRadius: "12px",
-      padding: "20px 24px",
-      display: "flex",
-      gap: "16px",
-      transition: "border-color 0.2s, transform 0.2s, box-shadow 0.2s",
-      cursor: "default",
-    }}
-      onMouseEnter={e => {
-        const el = e.currentTarget as HTMLElement;
-        el.style.borderColor = "#2a2a40";
-        el.style.transform = "translateY(-2px)";
-        el.style.boxShadow = "0 8px 32px rgba(0,0,0,0.4)";
-      }}
-      onMouseLeave={e => {
-        const el = e.currentTarget as HTMLElement;
-        el.style.borderColor = "#1a1a28";
-        el.style.transform = "translateY(0)";
-        el.style.boxShadow = "none";
-      }}
-    >
+    <div style={{ display: "flex", gap: "16px" }}>
       <OrgCircle initial={item.initial} color={item.color} />
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "8px" }}>
           <div>
-            <div style={{ fontSize: "12px", color: "#6b7280", marginBottom: "2px" }}>
+            <div style={{ fontSize: "12px", color: "rgba(255,255,255,0.65)", marginBottom: "2px" }}>
               {item.period} · {item.location}
             </div>
-            <div style={{ fontWeight: 700, fontSize: "16px", marginBottom: "1px" }}>{item.org}</div>
-            <div style={{ fontSize: "14px", color: "#9aa3b8", marginBottom: item.award ? "8px" : (isSimple ? 0 : "12px") }}>{item.role}</div>
+            <div style={{ fontWeight: 700, fontSize: "16px", marginBottom: "1px", color: "#fff" }}>{item.org}</div>
+            <div style={{ fontSize: "14px", color: "rgba(255,255,255,0.75)", marginBottom: item.award ? "8px" : (isSimple ? 0 : "12px") }}>{item.role}</div>
           </div>
           {item.score && (
-            <div style={{ fontSize: "14px", fontWeight: 600, color: "#e8eaf0", whiteSpace: "nowrap", flexShrink: 0 }}>{item.score}</div>
+            <div style={{ fontSize: "14px", fontWeight: 600, color: "#fff", whiteSpace: "nowrap", flexShrink: 0 }}>{item.score}</div>
           )}
         </div>
         {item.award && (
           <div style={{
             display: "inline-flex", alignItems: "center", gap: "6px",
             fontSize: "12px", color: "#f0a500",
-            background: "rgba(240,165,0,0.1)", border: "1px solid rgba(240,165,0,0.25)",
+            background: "#623c14", border: "1px solid #f0a500",
             borderRadius: "6px", padding: "3px 10px", marginBottom: "12px",
           }}>
             {item.award}
@@ -173,7 +151,7 @@ function ExperienceCard({ item }: { item: Entry }) {
         {item.bullets.length > 0 && (
           <ul style={{ listStyle: "disc", paddingLeft: "18px", display: "flex", flexDirection: "column", gap: "5px" }}>
             {item.bullets.map((b, i) => (
-              <li key={i} style={{ fontSize: "14px", color: "#9aa3b8", lineHeight: 1.65 }}>{b}</li>
+              <li key={i} style={{ fontSize: "14px", color: "rgba(255,255,255,0.75)", lineHeight: 1.65 }}>{b}</li>
             ))}
           </ul>
         )}
@@ -186,29 +164,77 @@ export default function ExperienceTabs() {
   const [tab, setTab] = useState<"work" | "education">("work");
   const items = tab === "work" ? WORK : EDUCATION;
 
+  const trackRef = useRef<HTMLDivElement>(null);
+  const btnRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+  const [pill, setPill] = useState<{ left: number; width: number } | null>(null);
+  // Toggled on then off around each switch purely to retrigger the
+  // liquidPillMorph keyframes (a squash-and-stretch wobble layered on top
+  // of the plain left/width slide, so the pill reads as soft/liquid
+  // instead of a rigid box sliding over).
+  const [morphing, setMorphing] = useState(false);
+
+  useLayoutEffect(() => {
+    const btn = btnRefs.current[tab];
+    const track = trackRef.current;
+    if (!btn || !track) return;
+    const trackRect = track.getBoundingClientRect();
+    const btnRect = btn.getBoundingClientRect();
+    setPill({ left: btnRect.left - trackRect.left, width: btnRect.width });
+  }, [tab]);
+
+  const selectTab = (t: "work" | "education") => {
+    if (t === tab) return;
+    setTab(t);
+    setMorphing(true);
+    // Belt-and-braces alongside onAnimationEnd: if the animationend event
+    // ever gets dropped (a reflow interrupts it, the tab is backgrounded),
+    // this still clears the class so the next switch can retrigger it.
+    window.setTimeout(() => setMorphing(false), 480);
+  };
+
   return (
     <div>
-      <div style={{
-        display: "flex", background: "#0d0d14", border: "1px solid #1a1a28",
+      <div ref={trackRef} style={{
+        position: "relative",
+        display: "flex", background: "#623c14", border: "1px solid rgba(255,255,255,0.15)",
         borderRadius: "12px", padding: "4px",
         width: "fit-content", margin: "0 auto 28px",
       }}>
+        {pill && (
+          <div
+            className={morphing ? "tab-liquid-pill morphing" : "tab-liquid-pill"}
+            onAnimationEnd={() => setMorphing(false)}
+            style={{
+              position: "absolute", top: "4px", bottom: "4px",
+              left: pill.left, width: pill.width,
+              borderRadius: "9px",
+              // Distinct shade per tab (not just one highlight color reused)
+              // so the active state itself signals which one you're on.
+              background: tab === "work" ? "#ff921c" : "#c2410c",
+            }}
+          />
+        )}
         {(["work", "education"] as const).map(t => (
-          <button key={t} onClick={() => setTab(t)} style={{
-            padding: "8px 40px", borderRadius: "9px", border: "none",
-            background: tab === t ? "#1a1a28" : "transparent",
-            color: tab === t ? "#e8eaf0" : "#6b7280",
-            fontSize: "14px", fontWeight: 500, cursor: "pointer",
-            transition: "background 0.2s, color 0.2s",
-            fontFamily: "inherit",
-            textTransform: "capitalize",
-          }}>
+          <button
+            key={t}
+            ref={(el) => { btnRefs.current[t] = el; }}
+            onClick={() => selectTab(t)}
+            style={{
+              position: "relative", zIndex: 1,
+              padding: "8px 40px", borderRadius: "9px", border: "none",
+              background: "transparent",
+              color: tab === t ? "#fff" : "#6b7280",
+              fontSize: "14px", fontWeight: 500, cursor: "pointer",
+              transition: "color 0.2s",
+              fontFamily: "inherit",
+              textTransform: "capitalize",
+            }}>
             {t === "work" ? "Work" : "Education"}
           </button>
         ))}
       </div>
 
-      <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+      <div key={tab} className="exp-fade-in" style={{ display: "flex", flexDirection: "column", gap: "26px" }}>
         {items.map((item, i) => (
           <ExperienceCard key={i} item={item} />
         ))}

@@ -14,6 +14,11 @@ html {
   font-size: 15px;
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
+  /* Not scroll-behavior:smooth — it fights GSAP ScrollTrigger's own scroll
+     tracking (the pinned hero recalculates layout as you scroll, which
+     interrupts a native smooth-scroll mid-flight). ScrollTransition.tsx
+     handles in-page anchor clicks itself via GSAP's ScrollToPlugin instead,
+     which cooperates with ScrollTrigger correctly. */
 }
 
 ::selection { background: rgba(76,142,247,0.25); }
@@ -26,6 +31,8 @@ a:hover { text-decoration: underline; text-underline-offset: 3px; }
 /* ── Hero link buttons ── */
 .hero-btn {
   display: inline-flex;
+  align-items: center;
+  gap: 8px;
   font-size: 14px; color: #e8eaf0; font-weight: 500;
   background: rgba(255,255,255,0.06); border: 1px solid #1e2030;
   border-radius: 8px; padding: 8px 20px;
@@ -38,24 +45,101 @@ a:hover { text-decoration: underline; text-underline-offset: 3px; }
   text-decoration: none;
 }
 
-/* ── Project cards ── */
-.project-card {
-  background: #0d0d14;
-  border: 1px solid #1a1a28;
-  border-radius: 12px;
-  padding: 20px;
-  display: flex;
-  flex-direction: column;
+/* ── Monotone colored hero link buttons (landing page) ── */
+.hero-btn-color {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px; color: #fff; font-weight: 600;
+  border: none;
+  border-radius: 8px; padding: 8px 20px;
+  transition: filter 0.15s, transform 0.15s;
+  text-decoration: none;
+}
+.hero-btn-color:hover {
+  filter: brightness(1.15);
+  transform: translateY(-1px);
+  text-decoration: none;
+}
+
+/* ── Hero status bar (whole bar links to /server) ── */
+.hero-status {
+  transition: border-color 0.15s, background 0.15s;
+}
+.hero-status:hover {
+  border-color: #4c8ef7 !important;
+  text-decoration: none;
+}
+.hero-status:hover .hero-status-arrow {
+  text-decoration: none;
+}
+
+/* ── npx shubhan terminal callout ── */
+.npx-callout {
+  display: inline-flex;
+  align-items: center;
   gap: 10px;
-  transition: border-color 0.2s, transform 0.2s, box-shadow 0.2s;
-  cursor: default;
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: 13px;
+  background: rgba(6,6,9,0.35);
+  border: 1px solid rgba(255,255,255,0.16);
+  border-radius: 8px;
+  padding: 9px 14px;
+  color: #fff;
 }
-.project-card:hover {
-  border-color: #2a2a40;
-  transform: translateY(-2px);
-  box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+.npx-callout-prompt {
+  color: rgba(255,255,255,0.4);
 }
-.project-card.clickable { cursor: pointer; }
+.npx-copy-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  color: rgba(255,255,255,0.7);
+  cursor: pointer;
+  padding: 2px;
+  margin-left: 2px;
+  position: relative;
+}
+.npx-copy-btn:hover {
+  color: #fff;
+}
+.npx-copy-tooltip {
+  position: absolute;
+  left: calc(100% + 9px);
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 11px;
+  font-family: var(--font-geist-sans), sans-serif;
+  font-weight: 500;
+  white-space: nowrap;
+  background: rgba(6,6,9,0.92);
+  border: 1px solid rgba(255,255,255,0.12);
+  color: #fff;
+  padding: 4px 10px;
+  border-radius: 6px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s;
+}
+.npx-copy-btn:hover .npx-copy-tooltip {
+  opacity: 1;
+}
+
+/* ── Waving hand emoji ── */
+@keyframes wave {
+  0%, 60%, 100% { transform: rotate(0deg); }
+  10%, 30% { transform: rotate(14deg); }
+  20% { transform: rotate(-8deg); }
+  40% { transform: rotate(14deg); }
+  50% { transform: rotate(-4deg); }
+}
+.wave-emoji {
+  display: inline-block;
+  transform-origin: 70% 70%;
+  animation: wave 2.4s ease-in-out infinite;
+}
 
 /* ── Commit rows ── */
 .commit-row {
@@ -70,40 +154,10 @@ a:hover { text-decoration: underline; text-underline-offset: 3px; }
 }
 .commit-row:hover { background: rgba(255,255,255,0.02); text-decoration: none; }
 
-/* ── Contact links ── */
-.contact-link {
-  font-size: 13px; color: #9aa3b8;
-  padding: 8px 16px; border: 1px solid #1e2030; border-radius: 8px;
-  transition: color 0.15s, border-color 0.15s;
-  text-decoration: none;
-}
-.contact-link:hover {
-  color: #4c8ef7;
-  border-color: #4c8ef7;
-  text-decoration: none;
-}
-
-/* ── Nav links ── */
-.nav-link {
-  font-size: 14px; color: #9aa3b8; font-weight: 500;
-  letter-spacing: 0.01em; transition: color 0.15s;
-  text-decoration: none;
-}
-.nav-link:hover { color: #e8eaf0; text-decoration: none; }
-
-.nav-server {
-  font-size: 14px; color: #9aa3b8; font-weight: 500;
-  display: flex; align-items: center; gap: 4px;
-  border: 1px solid #1e2030; border-radius: 6px;
-  padding: 2px 10px; transition: color 0.15s, border-color 0.15s;
-  text-decoration: none;
-}
-.nav-server:hover { color: #4c8ef7; border-color: #4c8ef7; text-decoration: none; }
-
 /* ── Commit cards ── */
 .commit-card {
-  background: #0d0d14;
-  border: 1px solid #1a1a28;
+  background: #623c14;
+  border: 1px solid rgba(255,255,255,0.15);
   border-top: 2px solid #1a2848;
   border-radius: 8px;
   padding: 14px 16px;
@@ -148,6 +202,18 @@ a:hover { text-decoration: underline; text-underline-offset: 3px; }
 }
 @media (max-width: 560px) { .cache-nodes-grid { grid-template-columns: repeat(2, 1fr); } }
 
+/* ── Server dashboard card hover ── same lift-on-hover language as
+   .hero-building-card on the portfolio (translateY + shadow), just tuned
+   for the server page's dark navy palette instead of the warm accents. */
+.srv-card {
+  transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
+}
+.srv-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 14px 30px rgba(0,0,0,0.45);
+  border-color: rgba(163,0,0,0.4);
+}
+
 .cluster-nodes-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr) 196px;
@@ -166,21 +232,543 @@ a:hover { text-decoration: underline; text-underline-offset: 3px; }
   overflow-x: auto;
 }
 
-/* ── Project link buttons ── */
-.proj-link-btn {
-  display: inline-flex;
+/* ── Background video (mouse-scrub hero) ── */
+/* .bg-video is now a WRAPPER div, not the <video> itself — see
+   BackgroundVideo.tsx. Opacity/scale (the scroll-driven fade) live here;
+   blur lives on .bg-video-inner (the actual <video>) instead. Combining
+   `filter: blur()` and a fading `opacity` on the SAME element is a known
+   rendering issue: blur samples right up to the element's edge as fully
+   transparent black, which bleeds a dark halo/fringe inward as opacity
+   drops — worse the more it's faded. Splitting them onto separate layers
+   (blur an always-opaque inner element; fade the wrapper around it)
+   avoids that entirely, since the blur itself never touches transparency. */
+.bg-video {
+  position: fixed;
+  top: 0;
+  height: 100%;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+  /* Force its own GPU compositing layer — with multiple stacked fixed
+     elements plus GSAP's pin-spacer also introducing a fixed layer during
+     the scroll transition, Chrome can otherwise composite them in the
+     wrong order relative to z-index. */
+  transform: translateZ(0);
+  will-change: opacity, transform;
+}
+.bg-video--right {
+  right: 0;
+  left: 42%;
+  width: 58%;
+}
+@media (max-width: 900px) {
+  .bg-video--right {
+    left: 0;
+    width: 100%;
+    opacity: 0.3;
+  }
+}
+.bg-video-inner {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  /* Shifted left from 85% — the source clip had a small AI-generation
+     watermark near the right shoulder. It's now been removed from the
+     file itself (a small, precisely-targeted patch at x:1146-1184,
+     y:572-636 — much smaller than an earlier, over-broad attempt), but
+     keeping some leftward shift here is cheap extra margin: on very wide
+     / short browser windows the visible crop can extend further right
+     than on typical ones, and this keeps that edge comfortably clear. */
+  object-position: 28% center;
+  will-change: filter;
+}
+@media (max-width: 900px) {
+  .bg-video-inner { object-position: 65% center; }
+}
+
+/* Blends the video into the landing page using the video's own warm
+   amber background color (sampled directly from the footage: #d38a21) —
+   the UI's own background is now this same color (not a darker shade of
+   it), so this can just fade straight to transparent with no intermediate
+   color ramp; there's no mismatch left to hide. */
+.bg-video-scrim {
+  position: fixed;
+  inset: -2vh -2vw;
+  z-index: 0;
+  pointer-events: none;
+  background: linear-gradient(90deg, #d38a21 0%, #d38a21 42%, rgba(211,138,33,0) 68%);
+  /* DIAGNOSTIC: dropped this element's own translateZ(0) GPU-layer
+     promotion. This is a static, never-animated gradient, so it doesn't
+     need its own compositing layer — and with .bg-video and
+     #transition-overlay each ALSO forcing their own layer via the same
+     hack, three overlapping fixed, full-viewport, independently-promoted
+     layers all present during the same fast scroll-snap burst is a
+     textbook setup for a Chrome compositing flicker (a brief, uniform
+     dark wash across everything, reported during rapid scroll reversal —
+     not something tied to any one element's own content). Removing the
+     ones that don't strictly need their own layer to see if that's it. */
+}
+@media (max-width: 900px) {
+  .bg-video-scrim { display: none; }
+}
+
+/* ── Landing page shell (contained, own scroll) ── */
+.landing-shell {
+  position: relative;
+  z-index: 1;
+  height: 100vh;
+  box-sizing: border-box;
+  overflow: hidden;
+  display: flex;
+  /* EXPERIMENTAL: no background at all (was faded transparent->#d38a21
+     in lockstep with the video, via a matching tween in
+     ScrollTransition.tsx) — that tween is what used to block
+     WaveBackground from showing through the empty flex space beside
+     .landing-left once expanded. Revert: restore that tween (see its
+     comment in ScrollTransition.tsx) and this back to
+     `background-color: rgba(211, 138, 33, 0);`. */
+}
+.landing-left {
+  position: relative;
+  height: 100%;
+  overflow: hidden;
+  width: min(560px, 92vw);
+  /* Top padding clears the single fixed nav pill (.landing-nav, docked
+     top-center in every scroll state) so hero text never renders
+     underneath it. No bottom nav anymore, so bottom padding is just
+     breathing room, not clearance for anything. */
+  padding: 96px 28px 32px 28px;
+  box-sizing: border-box;
+  /* Plain background-color (not a gradient/background-image) — this is
+     one of the CSS properties explicitly listed in ScrollTransition's
+     Flip `props`, so it can be tweened smoothly alongside the layout
+     morph rather than switching instantly the moment the end-state class
+     is applied (only transform/width/height get that treatment by
+     default; a gradient background-image can't be interpolated this way
+     at all, which is why this is a solid color rather than the previous
+     right-edge fade-to-video gradient). */
+  background-color: #d38a21;
+  /* Soft right-edge fade (was previously baked into the background as a
+     gradient-to-transparent) — a mask works on top of ANY background-color
+     without touching the property itself, so it stays constant in both
+     compact and expanded states and never fights Flip's backgroundColor
+     tween. In the compact state this melts the box into the video behind
+     it (their colors now match directly, no gradient trickery needed);
+     in the expanded/centered state it fades into the surrounding deep
+     brown, which reads as seamless there too.
+     Fixed pixel distance from the edge (not a %) — the box's width changes
+     a lot between compact/expanded, and a percentage-based stop faded
+     right into the actual text/button content at some widths instead of
+     staying within the empty right padding. */
+  -webkit-mask-image: linear-gradient(90deg, #000 0%, #000 calc(100% - 36px), transparent 100%);
+  mask-image: linear-gradient(90deg, #000 0%, #000 calc(100% - 36px), transparent 100%);
+  display: flex;
+  flex-direction: column;
+}
+@media (max-width: 900px) {
+  .landing-left {
+    width: 100%;
+    padding: 88px 20px 40px;
+    background-color: rgba(211,138,33,0.75);
+  }
+}
+/* Flip-animated end state once the hero->content scroll transition completes */
+.landing-left.landing-left--expanded {
+  width: min(780px, 92vw);
+  /* Auto margins on a flex item absorb the freed-up space evenly on both
+     sides, sliding the block from flush-left to centered — this is what
+     Flip actually animates (position, not just size), giving the "zoom
+     down into the centre" motion instead of a flush-left resize. */
+  margin-inline: auto;
+  /* Kept identical to the compact state's padding above (same 96/28/32/28)
+     — Flip's own transform handles the resize/recenter, and matching
+     padding exactly means there's zero padding divergence for it to
+     reconcile between the two states. */
+  padding: 96px 28px 32px 28px;
+  /* Content reads as centered under the (also centered) box, rather than
+     hugging the left edge of a now much wider container. */
   align-items: center;
-  font-size: 12px;
-  color: #e8eaf0;
-  background: rgba(255,255,255,0.06);
-  border: 1px solid #2a2a40;
-  border-radius: 6px;
-  padding: 4px 12px;
-  transition: background 0.15s, border-color 0.15s;
+  /* EXPERIMENTAL: transparent (was `#d38a21`, a flat flat fill matching
+     the rest of the site) so WaveBackground shows through here too once
+     the overlay/scrim clear at the start of the hold — see the matching
+     change in ScrollTransition.tsx. Revert both together if this doesn't
+     look right: this back to `background-color: #d38a21;`, and the
+     overlay/scrim fade in ScrollTransition.tsx back to the #skills-
+     triggered version. background-color specifically (not the
+     `background` shorthand) so it tweens via Flip's `props` list rather
+     than switching instantly. */
+  background-color: transparent;
+  /* Balances the leftover vertical space in the pinned 100vh box evenly
+     above/below the content instead of packing everything to the top and
+     dumping it all as one big gap underneath "Currently Building". */
+  justify-content: center;
+}
+/* NOT `.landing-left--expanded` — that class is applied once, synchronously,
+   the moment the scroll effect mounts, and stays on for the component's
+   whole lifetime (Flip only *simulates* the compact look via transform, it
+   never removes the class). A discrete property like text-align can't be
+   faked by a transform the way position/size can, so centering it off that
+   class centered the paragraph even while still visually in the compact,
+   pre-scroll hero. `.landing-left--settled` instead is toggled in
+   ScrollTransition.tsx's onUpdate, exactly when the Flip morph's own
+   progress reaches 1 (real layout, not a mid-flight transform) — see
+   MORPH_FRACTION there. */
+.landing-left--settled .hero-intro { text-align: center; }
+.landing-left--expanded .hero-avatar-row { justify-content: center; }
+.landing-left--expanded .hero-links { justify-content: center; }
+
+/* Flex order of the hero's pieces — Flip animates the reflow smoothly when
+   these values change between the compact and expanded states, rather than
+   the content just teleporting into a new sequence. */
+.hero-intro              { order: 1; }
+.hero-avatar-row         { order: 2; }
+.hero-links              { order: 3; }
+.hero-npx                { order: 4; margin-bottom: 14px; }
+.hero-currently-building { order: 5; }
+/* Expanded: npx-shubhan moves up to right after the avatar/intro, ahead of
+   the link buttons. */
+.landing-left--expanded .hero-npx   { order: 3; }
+.landing-left--expanded .hero-links { order: 4; }
+
+/* ── "Currently Building" card ── clickable (links to the live project),
+   with a hover lift + glow so it reads as an actionable card rather than
+   a static info box. */
+.hero-building-card {
+  display: block;
+  color: inherit;
+  text-decoration: none;
+  border: 1px solid rgba(255,255,255,0.18);
+  border-radius: 10px;
+  overflow: hidden;
+  background: rgba(255,255,255,0.02);
+  transition: transform 0.25s ease, box-shadow 0.25s ease,
+              border-color 0.25s ease, background-color 0.25s ease;
+}
+.hero-building-card:hover,
+.hero-building-card:focus-visible {
+  transform: translateY(-4px);
+  border-color: rgba(255,255,255,0.4);
+  background-color: rgba(255,255,255,0.07);
+  box-shadow: 0 14px 30px rgba(0,0,0,0.35);
   text-decoration: none;
 }
-.proj-link-btn:hover {
-  background: rgba(76,142,247,0.1);
-  border-color: #4c8ef7;
+.hero-building-card:active {
+  transform: translateY(-1px);
+}
+.hero-building-arrow {
+  color: rgba(255,255,255,0.6);
+  flex-shrink: 0;
+  opacity: 0;
+  transform: translate(-4px, 4px);
+  transition: opacity 0.25s ease, transform 0.25s ease, color 0.25s ease;
+}
+.hero-building-card:hover .hero-building-arrow,
+.hero-building-card:focus-visible .hero-building-arrow {
+  opacity: 1;
+  transform: translate(0, 0);
+  color: #fff;
+}
+
+.hero-avatar {
+  width: 64px;
+  height: 64px;
+}
+.landing-left--expanded .hero-avatar {
+  width: 120px;
+  height: 120px;
+}
+
+/* ── Scroll-down cue ── only shown once the hero has settled into its
+   expanded/centered state, where the remaining scroll-hold beat can read
+   as "is that it?" without a hint that Skills/Experience/Projects follow. */
+.hero-scroll-cue {
+  position: absolute;
+  left: 50%;
+  bottom: 28px;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  color: rgba(255,255,255,0.55);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0;
+  pointer-events: none;
+}
+.landing-left--expanded .hero-scroll-cue {
+  opacity: 1;
+}
+.hero-scroll-cue svg {
+  animation: scrollCueBounce 1.6s ease-in-out infinite;
+}
+@keyframes scrollCueBounce {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(5px); }
+}
+
+/* ── Scroll-transition overlay (crossfades hero into the post-hero color) ── */
+.transition-bg-overlay {
+  position: fixed;
+  /* Slight overscan, not inset:0 — a few px/vh sub-pixel rounding gap at
+     the viewport edge (seen under fractional devicePixelRatio) would
+     otherwise reveal the base page background through a hairline seam. */
+  inset: -2vh -2vw;
+  z-index: 0;
+  pointer-events: none;
+  background: #d38a21;
+  /* Opaque by default, not faded in — it sits BEHIND the video (see the
+     DOM order in page.tsx), fully covered by it at rest, so its own
+     opacity never needs to animate on the way in: fading the video out
+     alone already reveals this solid color cleanly underneath. Fading
+     THIS in too (the old approach) stacked a translucent color wash on
+     top of the still-partly-visible video instead of a clean dissolve.
+     It only still animates OUT, later, once past the hero. */
+  opacity: 1;
+  /* DIAGNOSTIC: translateZ(0) removed — see the matching note on
+     .bg-video-scrim. This element does still animate (opacity, later),
+     but stacking its own forced layer alongside .bg-video's and
+     .bg-video-scrim's (three overlapping fixed, full-viewport layers)
+     is the likely source of a reported compositing flicker during fast
+     scroll reversal. If removing it introduces visible jank on this
+     element's own fade instead, put it back on this one specifically
+     rather than all three at once. */
+}
+
+/* ── WaveBackground ── seamless-loop wave layers (see WaveBackground.tsx).
+   Only `transform` is animated (GPU-accelerated, no layout thrash); the
+   `from`/`to` values are exactly 0 and -50% because each layer's SVG is
+   the same periodic hump drawn twice back-to-back, so translating by half
+   its own width lands on a pixel-identical frame and the loop reads as
+   endless motion rather than a snap-back. */
+@keyframes wave-scroll {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
+}
+.animate-wave {
+  animation: wave-scroll linear infinite;
+  will-change: transform;
+}
+@media (prefers-reduced-motion: reduce) {
+  .animate-wave {
+    animation: none;
+    transform: translateX(-25%);
+  }
+}
+
+/* ── Spiral background (SpiralBackground.tsx) ── each spiral system spins
+   slowly and continuously around its own center, same "infinite, constant-
+   rate loop" idea as .animate-wave above, just rotation instead of
+   translation since that's the natural loop for a radially-arranged shape
+   (a spiral has no seam to hide, unlike a tiled wave). Durations are long
+   (95-150s per revolution) so it reads as a slow current, not a spinner. */
+@keyframes spiralSpin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+.spiral-spin {
+  animation: spiralSpin linear infinite;
+  animation-duration: var(--spiral-duration, 120s);
+  animation-direction: var(--spiral-direction, normal);
+  will-change: transform;
+}
+@media (prefers-reduced-motion: reduce) {
+  .spiral-spin { animation: none; }
+}
+
+/* ── Post-hero content sections (Skills / Experience / Projects) ── */
+.scroll-section {
+  position: relative;
+  z-index: 1;
+  padding: 80px 24px;
+}
+.scroll-section-inner {
+  max-width: 1160px;
+  margin: 0 auto;
+}
+
+/* ── Content panel — a genuinely distinct shade of the palette (not just a
+   border trick on the same hue as the page), so Skills/Experience/Projects
+   read as a separate surface rather than blending into the background. */
+.content-panel {
+  background: #8b5b19;
+  border-radius: 16px;
+  padding: 32px 40px;
+}
+
+/* ── Work/Education liquid tab pill ── a single shared highlight that
+   slides between tab positions (left/width transition) instead of each
+   button flipping its own background on and off. The .morphing keyframes
+   layer a brief squash-and-stretch on top of that slide so it reads as
+   soft/liquid rather than a rigid chip sliding along a track. */
+.tab-liquid-pill {
+  transition: left 0.45s cubic-bezier(0.34, 1.56, 0.64, 1),
+              width 0.45s cubic-bezier(0.34, 1.56, 0.64, 1),
+              background 0.3s ease;
+}
+.tab-liquid-pill.morphing {
+  animation: liquidPillMorph 0.45s ease-out;
+}
+@keyframes liquidPillMorph {
+  0%   { transform: scaleY(1) scaleX(1); }
+  35%  { transform: scaleY(0.8) scaleX(1.14); }
+  70%  { transform: scaleY(1.08) scaleX(0.95); }
+  100% { transform: scaleY(1) scaleX(1); }
+}
+
+/* Experience card list fades/slides in fresh each time the tab switches
+   (the list remounts via a `key={tab}` on its wrapper) instead of hard-
+   cutting between Work and Education content. */
+.exp-fade-in {
+  animation: expFadeIn 0.4s ease;
+}
+@keyframes expFadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@media (max-width: 640px) {
+  .content-panel { padding: 24px 20px; }
+}
+
+/* ── Sticky-note board (Projects) ── a corkboard-style surface built from
+   layered radial-gradient "speckles" instead of an image texture, holding
+   freely draggable project notes (drag state is plain component state,
+   not persisted — resets on reload by design). */
+.sticky-board {
+  position: relative;
+  border-radius: 16px;
+  /* Solid border + an inset highlight ring reads as a beveled wooden
+     frame around the cork surface, without relying on border-image
+     (which fights border-radius rounding in some browsers). */
+  border: 14px solid #5c3517;
+  background-color: #8a5a2e;
+  background-image:
+    radial-gradient(circle at 15% 25%, rgba(0,0,0,0.12) 0, transparent 3px),
+    radial-gradient(circle at 55% 60%, rgba(0,0,0,0.1) 0, transparent 3px),
+    radial-gradient(circle at 80% 15%, rgba(0,0,0,0.1) 0, transparent 3px),
+    radial-gradient(circle at 30% 80%, rgba(0,0,0,0.08) 0, transparent 3px),
+    radial-gradient(circle at 90% 70%, rgba(0,0,0,0.1) 0, transparent 3px);
+  background-size: 70px 70px, 90px 90px, 65px 65px, 85px 85px, 75px 75px;
+  background-clip: padding-box;
+  box-shadow:
+    inset 0 0 0 3px #7a4a26,
+    inset 0 0 70px rgba(0,0,0,0.35),
+    0 8px 24px rgba(0,0,0,0.4);
+  overflow: hidden;
+}
+.sticky-note {
+  position: absolute;
+  width: min(270px, 82vw);
+  padding: 16px 18px;
+  border-radius: 3px;
+  cursor: grab;
+  user-select: none;
+  /* Without this, touch browsers try to scroll the page instead of
+     letting pointer events drive the drag. */
+  touch-action: none;
+  transition: box-shadow 0.15s;
+}
+.sticky-note:active { cursor: grabbing; }
+.sticky-note-tape {
+  position: absolute;
+  top: -10px;
+  left: 50%;
+  transform: translateX(-50%) rotate(-4deg);
+  width: 56px;
+  height: 20px;
+  background: rgba(255,255,255,0.55);
+  border: 1px solid rgba(255,255,255,0.35);
+  pointer-events: none;
+}
+@media (max-width: 640px) {
+  .sticky-board { padding-bottom: 20px; }
+}
+
+/* ── Skill "notes" — same pinned-paper language as the Projects board,
+   scaled down for a tag cloud. Not draggable (too many small ones to be
+   worth it), just visually part of the same board world: rotated,
+   colored per category, dark ink text instead of white-on-dark chips. */
+.skill-note {
+  display: inline-block;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 3px;
+  padding: 4px 11px;
+  box-shadow: 2px 3px 6px rgba(0,0,0,0.25);
+}
+
+/* ── Floating section-nav pill ── a persistent top-level element (not
+   nested in the pinned hero) so it survives scrolling into the
+   Skills/Experience/Projects sections instead of scrolling away with the
+   hero. Deliberately auto-sized (not a full-width bar) so it can never
+   grow into a block that covers page content. Docked top-center in every
+   scroll state, including the hero itself. Text links (not icons) — this
+   used to be two separate bars (an icon rail up top, this text bar at the
+   bottom); now it's the only nav, carrying everything including the
+   download-CV link that used to live in the icon rail. */
+.landing-nav {
+  position: fixed;
+  left: 50%;
+  top: 18px;
+  transform: translateX(-50%);
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 18px;
+  border-radius: 999px;
+  /* Leather brown (#71421B) — a grounded, tactile accent next to the
+     site's flat orange rather than another shade competing with it. White
+     border + shadow keep its edges defined against the page's own lighter
+     orange behind it. */
+  background: rgba(113,66,27,0.95);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255,255,255,0.25);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.35);
+}
+.landing-nav a {
+  color: rgba(255,255,255,0.75);
+  font-size: 13px;
+  font-weight: 600;
   text-decoration: none;
+  transition: color 0.15s;
+  position: relative;
+  /* The liquid blob below sizes itself to this link's own bounding box —
+     padding here is what gives the highlight breathing room around the
+     text instead of hugging it exactly, which read as cramped/odd. */
+  padding: 7px 10px;
+}
+.landing-nav a:hover {
+  color: #fff;
+  text-decoration: none;
+}
+/* ── Liquid hover blob ── a single shared highlight that glides between
+   links (measured live off the DOM) instead of each link flashing its own
+   background on hover. */
+.nav-liquid-blob {
+  position: absolute;
+  border-radius: 8px;
+  background: rgba(255,255,255,0.14);
+  pointer-events: none;
+  z-index: 0;
+  transition: left 0.35s cubic-bezier(0.34, 1.56, 0.64, 1),
+              top 0.35s cubic-bezier(0.34, 1.56, 0.64, 1),
+              width 0.35s cubic-bezier(0.34, 1.56, 0.64, 1),
+              height 0.35s cubic-bezier(0.34, 1.56, 0.64, 1),
+              opacity 0.15s ease;
+}
+.nav-liquid-blob.morphing {
+  animation: liquidBlobMorph 0.35s ease-out;
+}
+@keyframes liquidBlobMorph {
+  0%   { transform: scale(1, 1); }
+  35%  { transform: scale(1.18, 0.82); }
+  70%  { transform: scale(0.94, 1.08); }
+  100% { transform: scale(1, 1); }
+}
+@media (max-width: 640px) {
+  .landing-nav { display: none; }
 }

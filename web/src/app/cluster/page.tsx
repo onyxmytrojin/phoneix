@@ -19,10 +19,13 @@ type ClusterData = {
 type KeyData = { key: string; node_id: string; hits?: number; ttl_seconds?: number };
 type Ev = { time: string; cls: string; text: string };
 
+// Same server-room palette as /server: near-black base, deep-red accent,
+// green/orange/red for alive/suspect/dead — not the portfolio's yellow, and
+// no blue either (an earlier navy pass here read "off").
 const C = {
-  bg: "#0e1117", surf: "#161c27", border: "#252d3d",
-  text: "#e4eaf5", muted: "#6e7d99",
-  accent: "#4c8ef7", alive: "#34c47c", suspect: "#f0a500", dead: "#e05252",
+  bg: "#050505", surf: "#141414", border: "#262626",
+  text: "#e8eaf0", muted: "#8a8a8a",
+  accent: "#A30000", alive: "#84B082", suspect: "#E28413", dead: "#95190C",
 };
 
 const sc = (s?: string) => ["alive","suspect","dead"].includes(s ?? "") ? s! : "unreachable";
@@ -54,7 +57,7 @@ function dedupe(arr: string[]) {
 }
 
 // ── Hash Ring SVG ──────────────────────────────────────────────────
-const NODE_COLORS = ["#4c8ef7","#34c47c","#f0a500"];
+const NODE_COLORS = [C.accent, C.alive, C.suspect];
 const ARC_DEFS = [{s:150,e:270},{s:270,e:30},{s:30,e:150}];
 const toRad = (d: number) => d * Math.PI / 180;
 
@@ -96,9 +99,9 @@ function HashRing({ nodes }: { nodes: NodeData[] }) {
           <circle cx={p.x.toFixed(1)} cy={p.y.toFixed(1)} r="10"
             fill={p.color} fillOpacity={p.dead?0.05:0.18} stroke={p.color} strokeWidth="1.5"/>
           {p.keys!=="" && <text x={p.x.toFixed(1)} y={(p.y+3.5).toFixed(1)}
-            textAnchor="middle" fill={p.color} fontSize="8" fontFamily="monospace">{p.keys}</text>}
+            textAnchor="middle" fill={p.color} fontSize="8" fontFamily="var(--font-geist-mono), monospace">{p.keys}</text>}
           <text x={p.lx.toFixed(1)} y={(p.ly+3).toFixed(1)}
-            textAnchor="middle" fill={C.muted} fontSize="9" fontFamily="monospace">{p.short}</text>
+            textAnchor="middle" fill={C.muted} fontSize="9" fontFamily="var(--font-geist-mono), monospace">{p.short}</text>
         </g>
       ))}
     </svg>
@@ -216,7 +219,7 @@ export default function ClusterPage() {
   );
 
   return (
-    <div style={{minHeight:"100vh",background:C.bg,color:C.text,fontFamily:"'Cascadia Code','JetBrains Mono','Fira Mono',ui-monospace,'Courier New',monospace",fontSize:"13px"}}>
+    <div style={{minHeight:"100vh",background:C.bg,color:C.text,fontSize:"13px"}}>
 
       {/* ── Header ── */}
       <header className="cluster-header" style={{background:C.surf,borderBottom:`1px solid ${C.border}`}}>
@@ -261,7 +264,7 @@ export default function ClusterPage() {
             const p50 = n.get_p50_us&&n.get_p50_us>0?fmtUs(n.get_p50_us):null;
             const cmds = dedupe((n.recent_cmds||[]).slice().reverse().slice(0,4));
             if (st==="unreachable") return (
-              <div key={id} style={{background:C.surf,border:`1px solid ${C.border}`,borderRadius:"5px",overflow:"hidden"}}>
+              <div key={id} className="srv-card" style={{background:C.surf,border:`1px solid ${C.border}`,borderRadius:"5px",overflow:"hidden"}}>
                 <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"9px 13px",borderBottom:`1px solid ${C.border}`}}>
                   <span style={{fontSize:"13px",fontWeight:600}}>{id}</span>
                   <span style={{display:"flex",alignItems:"center",gap:"5px",fontSize:"10px",color:C.muted}}>
@@ -272,9 +275,9 @@ export default function ClusterPage() {
               </div>
             );
             return (
-              <div key={id} style={{background:C.surf,border:`1px solid ${C.border}`,borderRadius:"5px",overflow:"hidden"}}>
+              <div key={id} className="srv-card" style={{background:C.surf,border:`1px solid ${C.border}`,borderRadius:"5px",overflow:"hidden"}}>
                 <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"9px 13px",borderBottom:`1px solid ${C.border}`}}>
-                  <span style={{fontSize:"13px",fontWeight:600}}>
+                  <span style={{fontSize:"13px",fontWeight:600,fontFamily:"var(--font-geist-mono), monospace"}}>
                     {id}<span style={{color:C.muted,fontWeight:400}}>{n.port?`:${n.port}`:""}</span>
                   </span>
                   <div style={{display:"flex",alignItems:"center",gap:"6px"}}>
@@ -322,7 +325,7 @@ export default function ClusterPage() {
                     <hr style={{border:"none",borderTop:`1px solid ${C.border}`,margin:"2px 0"}}/>
                     <div style={{fontSize:"9px",letterSpacing:"0.08em",textTransform:"uppercase",color:C.muted,marginBottom:"2px"}}>Recent Cmds</div>
                     {cmds.map((c,ci)=>(
-                      <div key={ci} style={{fontSize:"10px",color:C.muted,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",lineHeight:1.4}}>
+                      <div key={ci} style={{fontSize:"10px",color:C.muted,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",lineHeight:1.4,fontFamily:"var(--font-geist-mono), monospace"}}>
                         <span style={{color:C.accent,fontWeight:600}}>{c.cmd.split(" ")[0]}</span>
                         {" "}<span style={{color:C.text}}>{c.cmd.split(" ").slice(1).join(" ").slice(0,20)}</span>
                         {c.count>1&&<span style={{color:C.muted,fontSize:"9px"}}> ×{c.count}</span>}
@@ -339,7 +342,7 @@ export default function ClusterPage() {
           )}
 
           {/* Hash ring */}
-          <div style={{background:C.surf,border:`1px solid ${C.border}`,borderRadius:"5px",padding:"12px 10px 10px",display:"flex",flexDirection:"column",alignItems:"center",gap:"8px"}}>
+          <div className="srv-card" style={{background:C.surf,border:`1px solid ${C.border}`,borderRadius:"5px",padding:"12px 10px 10px",display:"flex",flexDirection:"column",alignItems:"center",gap:"8px"}}>
             <div style={{fontSize:"10px",letterSpacing:"0.1em",textTransform:"uppercase",color:C.muted,alignSelf:"flex-start"}}>Hash Ring</div>
             {data&&<HashRing nodes={data.nodes}/>}
           </div>
@@ -347,7 +350,7 @@ export default function ClusterPage() {
 
         {/* ── Latency comparison ── */}
         {p50Str&&(
-          <div style={{background:C.surf,border:`1px solid ${C.border}`,borderRadius:"5px",padding:"11px 13px",display:"flex",flexDirection:"column",gap:"8px"}}>
+          <div className="srv-card" style={{background:C.surf,border:`1px solid ${C.border}`,borderRadius:"5px",padding:"11px 13px",display:"flex",flexDirection:"column",gap:"8px"}}>
             <div style={{fontSize:"10px",letterSpacing:"0.1em",textTransform:"uppercase",color:C.muted}}>Latency Comparison</div>
             <div style={{display:"flex",flexDirection:"column",gap:"6px"}}>
               {[
@@ -368,7 +371,7 @@ export default function ClusterPage() {
         )}
 
         {/* ── Key browser ── */}
-        <div style={{background:C.surf,border:`1px solid ${C.border}`,borderRadius:"5px",overflow:"hidden"}}>
+        <div className="srv-card" style={{background:C.surf,border:`1px solid ${C.border}`,borderRadius:"5px",overflow:"hidden"}}>
           <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"7px 13px",borderBottom:`1px solid ${C.border}`}}>
             <span style={{fontSize:"10px",letterSpacing:"0.1em",textTransform:"uppercase",color:C.muted}}>Key Browser</span>
             <span style={{fontSize:"11px",color:C.muted}}>{ukeys.length} key{ukeys.length!==1?"s":""}</span>
@@ -384,7 +387,7 @@ export default function ClusterPage() {
             const tpct = ttl==null||ttl<0?100:Math.max(2,Math.min(100,(ttl/3600)*100));
             return (
               <div key={kn} onClick={()=>{setSelKey(kn);setKeyVal(copies.map(c=>`node: ${c.node_id}\nhits: ${c.hits??0}\nttl: ${fmtTTL(c.ttl_seconds)}`).join("\n---\n"));}} style={{display:"grid",gridTemplateColumns:"1fr auto auto",gap:"10px",alignItems:"center",padding:"7px 13px",borderBottom:`1px solid color-mix(in srgb,${C.border} 55%,transparent)`,fontSize:"11px",cursor:"pointer"}}>
-                <span style={{fontSize:"12px",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{kn}</span>
+                <span style={{fontSize:"12px",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",fontFamily:"var(--font-geist-mono), monospace"}}>{kn}</span>
                 <span style={{display:"flex",alignItems:"center",gap:"4px"}}>
                   <span style={{fontSize:"10px",color:C.accent,padding:"1px 6px",background:`color-mix(in srgb,${C.accent} 12%,transparent)`,borderRadius:"3px",whiteSpace:"nowrap"}}>{primary.node_id}</span>
                   {copies.length>1&&<span style={{fontSize:"9px",color:C.muted}}>×{copies.length}</span>}
@@ -402,7 +405,7 @@ export default function ClusterPage() {
         </div>
 
         {/* ── Gossip events ── */}
-        <div style={{background:C.surf,border:`1px solid ${C.border}`,borderRadius:"5px",overflow:"hidden"}}>
+        <div className="srv-card" style={{background:C.surf,border:`1px solid ${C.border}`,borderRadius:"5px",overflow:"hidden"}}>
           <div style={{padding:"7px 13px",borderBottom:`1px solid ${C.border}`}}>
             <span style={{fontSize:"10px",letterSpacing:"0.1em",textTransform:"uppercase",color:C.muted}}>Gossip Events</span>
           </div>
