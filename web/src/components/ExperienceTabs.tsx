@@ -12,14 +12,6 @@ type Entry = {
   award: string | null;
   bullets: string[];
   score?: string;
-  // Poor-man's grouping for a long flat bullet list: each bullet is
-  // "Lead-in — rest of the bullet", and the lead-in renders bold so a
-  // scanner gets the same map section headers would have given, without
-  // actually restructuring the list. Opt-in per entry (rather than
-  // detected from bullet content) so it doesn't accidentally bold
-  // unrelated em-dash asides elsewhere (e.g. the Education bullets below
-  // already use " — " for their own, different purpose).
-  boldLeadIns?: boolean;
 };
 
 const WORK: Entry[] = [
@@ -31,19 +23,15 @@ const WORK: Entry[] = [
     period: "Jun 2025 – Ongoing",
     location: "Bengaluru, India",
     award: "🏆 Q3 Growth Mindset Award & Q4 Think Big Award",
-    boldLeadIns: true,
     bullets: [
-      "Payment-retry engine — Architected and shipped an in-house, event-driven payment-retry engine on AWS Lambda, SQS FIFO, EventBridge, and DynamoDB, replacing a third-party dunning system with a custom policy graph supporting pause/resume, partial funds, and self-healing payment-method blacklisting.",
-      "Concurrency hardening — Hardened the engine against concurrent-event races: provider-event-ID dedup keys for exactly-once processing, plus DynamoDB conditional writes and consistent reads so settlement and retry events can never resurrect a resolved invoice.",
-      "Recovery lifecycle — Designed an automated customer payment-recovery lifecycle: collection pauses when no usable payment method exists, the customer is guided to update it, and retries resume automatically once they do — or wind down through the normal policy path if they never do.",
-      "95% p99 cut — Cut a customer-facing summary endpoint's cold-cache p99 by over 95% to sub-second, by rewriting per-row correlated subqueries into a parallelized two-pass query pipeline with counts recombined at the application layer — equivalence proven via SQL snapshot tests.",
-      "Query-plan forensics — Diagnosed a severe p99 regression on a usage endpoint to a non-sargable timestamp predicate scanning full org history; a DST-safe sargable bound across 14 query sites enabled a combined-index plan — ~5× fewer disk block reads, sub-500ms, provably identical results.",
-      "RBAC — Built server-side RBAC for the customer portal: token-based authentication, an explicit roles × resources policy matrix, and row-level ownership enforcement across the portal's data domains.",
-      "Billing APIs — Developed the FastAPI billing API surface behind the customer portal (invoices, payment sources, subscriptions, usage) with dual authentication for internal users and API clients.",
-      "Reconciliation engine — Built an automated post-invoice reconciliation engine performing session-level diffs to detect and correct over- and under-billing after invoice closure.",
-      "Full-population audit — Audited the full population of production prepaid usage records against billed sessions (no sampling), including timezone-boundary correctness.",
-      "Enterprise billing — Automated multi-tenant enterprise billing, including master–child invoicing and automatic correction invoicing for contract-based pricing adjustments.",
-      "Alert automation — Integrated CRM and Slack APIs for exception-driven ticket routing and alert enrichment, including log-attribution logic that suppresses false-positive latency alerts without touching the underlying alarms.",
+      "Architected and shipped an in-house, event-driven payment-retry engine on AWS Lambda, SQS FIFO, EventBridge, and DynamoDB — replacing a third-party dunning system with a custom policy graph supporting pause/resume, partial funds, and self-healing payment-method blacklisting — and hardened it against concurrent-event races with provider-event-ID dedup keys plus DynamoDB conditional writes and consistent reads, so settlement and retry events can never resurrect a resolved invoice.",
+      "Designed an automated customer payment-recovery lifecycle: collection pauses when no usable payment method exists, the customer is guided to update it, and retries resume automatically once they do — or wind down through the normal policy path if they never do.",
+      "Cut a customer-facing summary endpoint's cold-cache p99 by over 95% to sub-second, by rewriting per-row correlated subqueries into a parallelized two-pass query pipeline with counts recombined at the application layer — equivalence proven via SQL snapshot tests.",
+      "Diagnosed a severe p99 regression on a usage endpoint to a non-sargable timestamp predicate scanning full org history; a DST-safe sargable bound across 14 query sites enabled a combined-index plan — ~5× fewer disk block reads, sub-500ms, provably identical results.",
+      "Built server-side RBAC and the FastAPI billing API surface for the customer portal — token-based authentication, an explicit roles × resources policy matrix, and row-level ownership enforcement, with dual authentication for internal users and API clients.",
+      "Built an automated post-invoice reconciliation engine performing session-level diffs to detect and correct over- and under-billing after invoice closure, validated against a full-population audit of production prepaid usage records (no sampling), including timezone-boundary correctness.",
+      "Automated multi-tenant enterprise billing, including master–child invoicing and automatic correction invoicing for contract-based pricing adjustments.",
+      "Integrated CRM and Slack APIs for exception-driven ticket routing and alert enrichment, including log-attribution logic that suppresses false-positive latency alerts without touching the underlying alarms.",
     ],
   },
   {
@@ -54,12 +42,11 @@ const WORK: Entry[] = [
     period: "Oct 2024 – May 2025",
     location: "Bengaluru, India",
     award: null,
-    boldLeadIns: true,
     bullets: [
-      "Access-control migration — Migrated 5 product access controls from static, code-defined access lists to a centralized feature-flag and user-authorization model spanning 6+ backend services — turning per-customer code deploys into data-driven configuration changes.",
-      "User Profiles system — Built a User Profiles system across the stack: database migrations, a profile registry with per-category defaults, API serializers, shared client-library accessors consumed by downstream services, and an admin UI for assignment.",
-      "Default consistency — Enforced profile-default consistency across every user-creation path, so users get correct defaults regardless of how they enter the system.",
-      "Self-service enablement — Enabled customer self-service toggling of a previously engineering-gated product capability in the portal — removing engineering from the loop for the common case.",
+      "Migrated 5 product access controls from static, code-defined access lists to a centralized feature-flag and user-authorization model spanning 6+ backend services — turning per-customer code deploys into data-driven configuration changes.",
+      "Built a User Profiles system across the stack: database migrations, a profile registry with per-category defaults, API serializers, shared client-library accessors consumed by downstream services, and an admin UI for assignment.",
+      "Enforced profile-default consistency across every user-creation path, so users get correct defaults regardless of how they enter the system.",
+      "Enabled customer self-service toggling of a previously engineering-gated product capability in the portal — removing engineering from the loop for the common case.",
     ],
   },
   {
@@ -116,22 +103,6 @@ const EDUCATION: Entry[] = [
   },
 ];
 
-// Splits a "Lead-in — rest" bullet on its FIRST " — " only, so a lead-in
-// deliberately placed at the very start is captured correctly even when
-// the bullet's own text later uses " — " again for an unrelated aside
-// (several of these bullets do). Falls back to plain text if the bullet
-// has no lead-in at all.
-function BulletText({ text }: { text: string }) {
-  const splitAt = text.indexOf(" — ");
-  if (splitAt === -1) return <>{text}</>;
-  return (
-    <>
-      <strong style={{ color: "#fff" }}>{text.slice(0, splitAt)}</strong>
-      {text.slice(splitAt)}
-    </>
-  );
-}
-
 function OrgCircle({ initial, color }: { initial: string; color: string }) {
   const len = initial.length;
   const fs = len <= 1 ? 16 : len <= 2 ? 13 : len <= 3 ? 11 : 9;
@@ -179,9 +150,7 @@ function ExperienceCard({ item }: { item: Entry }) {
         {item.bullets.length > 0 && (
           <ul style={{ listStyle: "disc", paddingLeft: "18px", display: "flex", flexDirection: "column", gap: "5px" }}>
             {item.bullets.map((b, i) => (
-              <li key={i} style={{ fontSize: "14px", color: "rgba(255,255,255,0.75)", lineHeight: 1.65 }}>
-                {item.boldLeadIns ? <BulletText text={b} /> : b}
-              </li>
+              <li key={i} style={{ fontSize: "14px", color: "rgba(255,255,255,0.75)", lineHeight: 1.65 }}>{b}</li>
             ))}
           </ul>
         )}
