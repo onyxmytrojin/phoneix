@@ -18,17 +18,20 @@ export default function HeroLinks() {
   const textRefs = useRef<(HTMLSpanElement | null)[]>([]);
   const btnRefs = useRef<(HTMLAnchorElement | null)[]>([]);
 
-  // Lock each button to its natural (real-label) width once, before paint —
-  // the scramble effect swaps in random characters whose glyphs can render
-  // narrower OR wider than the real label, which was nudging each button's
-  // own width and, in a wrapping flex row, bumping the last button down for
-  // a frame while it scrambled. An exact width (not min-width, which only
-  // stops shrinking) means the button's box can never move in either
-  // direction regardless of what the scramble animation renders inside it.
+  // Lock every button to the SAME width (the widest label's natural width)
+  // once, before paint. Originally this locked each button to its own
+  // individual width, which did stop the scramble effect (random-character
+  // glyphs render narrower/wider than the real label) from shifting layout
+  // — but four different label lengths ("GitHub" vs "LinkedIn", "Email" vs
+  // "API Docs") made the row/wrap grid look uneven. A single shared width
+  // keeps that same anti-shift guarantee while also lining the buttons up
+  // into a clean, evenly-sized grid.
   useLayoutEffect(() => {
+    const widths = btnRefs.current.map((el) => el?.getBoundingClientRect().width ?? 0);
+    const maxWidth = Math.max(...widths);
     btnRefs.current.forEach((el) => {
       if (!el) return;
-      el.style.width = `${el.getBoundingClientRect().width}px`;
+      el.style.width = `${maxWidth}px`;
     });
   }, []);
 
