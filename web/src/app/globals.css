@@ -406,6 +406,66 @@ a:hover { text-decoration: underline; text-underline-offset: 3px; }
      dumping it all as one big gap underneath "Currently Building". */
   justify-content: center;
 }
+/* Reclaims some vertical space in the hero's content stack on mobile —
+   harmless/beneficial at any mobile height, so this part isn't gated on
+   viewport height. `!important` only on the ones overriding an inline
+   style from page.tsx (the standard justified use for it); the rest are
+   plain classes and just need a normal override. */
+@media (max-width: 640px) {
+  .hero-intro p { margin-bottom: 22px !important; }
+  .hero-avatar-row { margin-bottom: 8px !important; }
+  .hero-links-row { margin-bottom: 12px !important; }
+  .hero-npx { margin-bottom: 8px; }
+  .hero-currently-building { padding-top: 8px !important; }
+  .hero-scroll-cue { margin-top: 8px; }
+}
+/* On a genuinely SHORT phone screen (not just narrow), the hero's content
+   stack can end up taller than the available height even after the trims
+   above. `justify-content: center` (the base/desktop rule) then centers
+   that overflow — pushing the *top* of the content up past padding-top by
+   half the overflow amount, same as it clips the bottom by the other
+   half. That's what was pushing the heading up underneath the nav pill,
+   not just the cue getting clipped at the bottom. Switching to flex-start
+   here makes the top of the content land exactly at padding-top, always —
+   predictable clearance under the nav, with any remaining overflow now
+   confined to the bottom edge only (where clipping is far less noticeable
+   than it is stacked on top of the page's own heading). 118px of
+   padding-top is enough to clear .landing-nav wrapped to its 2-row mobile
+   layout (~95px tall) with a comfortable margin. */
+@media (max-width: 640px) and (max-height: 700px) {
+  /* Both selectors here match the compound ".landing-left.landing-left
+     --expanded" specificity the base expanded rule uses (two classes,
+     0-2-0) — a single-class selector here would lose to that regardless
+     of media query or source order, since specificity is compared before
+     either of those. */
+  .landing-left,
+  .landing-left.landing-left--expanded {
+    padding-top: 118px;
+    padding-bottom: 12px;
+    justify-content: flex-start;
+  }
+  .landing-left--expanded .hero-avatar {
+    width: 76px;
+    height: 76px;
+  }
+  /* Further content-height trims — same idea as the width-only block
+     above, just more aggressive, since flex-start (above) means every
+     remaining pixel of overflow now shows up stacked at the very bottom
+     (the cue, then the card) instead of being half-absorbed by centering. */
+  .hero-intro h1 { font-size: 24px !important; margin-bottom: 6px !important; }
+  .hero-intro p { line-height: 1.4 !important; margin-bottom: 14px !important; }
+  .hero-avatar-row { gap: 8px !important; }
+  .hero-btn-color { padding: 6px 14px !important; font-size: 13px !important; }
+  .hero-currently-building h2 { margin-bottom: 6px !important; }
+  .hero-building-card-body { padding: 10px 14px !important; gap: 6px !important; }
+  /* Tags read as redundant with the card's own description right above
+     them — the first thing to drop when a short screen is this tight.
+     The description goes next if tags alone weren't enough — the card's
+     title + LIVE badge stay either way, so it's still clearly a card
+     pointing at something, just without the supporting copy. */
+  .hero-building-tags { display: none !important; }
+  .hero-building-desc { display: none !important; }
+}
 /* NOT `.landing-left--expanded` — that class is applied once, synchronously,
    the moment the scroll effect mounts, and stays on for the component's
    whole lifetime (Flip only *simulates* the compact look via transform, it
@@ -802,5 +862,21 @@ a:hover { text-decoration: underline; text-underline-offset: 3px; }
   100% { transform: scale(1, 1); }
 }
 @media (max-width: 640px) {
-  .landing-nav { display: none; }
+  /* Used to hide entirely here — a leftover from when there were two nav
+     bars (this one plus an icon rail); once this became the only nav,
+     hiding it left mobile with no way to navigate at all. Scaled down and
+     allowed to wrap to a second row instead, since six links at full
+     desktop size don't fit a phone-width screen in one row. */
+  .landing-nav {
+    max-width: 92vw;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 3px 5px;
+    padding: 6px 12px;
+    top: 10px;
+  }
+  .landing-nav a {
+    font-size: 10.5px;
+    padding: 4px 7px;
+  }
 }

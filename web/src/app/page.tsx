@@ -112,20 +112,20 @@ export default function Landing() {
           <div className="hero-currently-building" style={{ paddingTop: "16px" }}>
             <h2 style={{ fontSize: "14px", fontWeight: 700, color: "#fff", marginBottom: "12px", opacity: 0.85 }}>Currently Building</h2>
             <a href="/cluster" className="hero-building-card">
-              <div style={{ display: "flex", flexDirection: "column", padding: "14px 18px", gap: "10px" }}>
+              <div className="hero-building-card-body" style={{ display: "flex", flexDirection: "column", padding: "14px 18px", gap: "10px" }}>
                 <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "8px" }}>
                   <div style={{ borderLeft: "3px solid #fff", paddingLeft: "12px" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: "7px", marginBottom: "2px" }}>
                       <span style={{ fontWeight: 700, fontSize: "14px" }}>Phoneix</span>
                       <span style={{ fontSize: "9px", color: "#fff", background: "#22c55e", borderRadius: "4px", padding: "1px 6px", fontWeight: 700, letterSpacing: "0.05em" }}>LIVE</span>
                     </div>
-                    <div style={{ fontSize: "12px", color: "rgba(255,255,255,0.7)" }}>Personal API + distributed cache running on a Pixel 7a</div>
+                    <div className="hero-building-desc" style={{ fontSize: "12px", color: "rgba(255,255,255,0.7)" }}>Personal API + distributed cache running on a Pixel 7a</div>
                   </div>
                   <svg className="hero-building-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M7 17L17 7M17 7H9M17 7V15" />
                   </svg>
                 </div>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
+                <div className="hero-building-tags" style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
                   {["FastAPI", "Go", "Distributed Systems"].map(t => (
                     <span key={t} style={{ fontSize: "11px", color: "#fff", background: "rgba(255,255,255,0.12)", border: "1px solid rgba(255,255,255,0.2)", borderRadius: "4px", padding: "2px 8px" }}>{t}</span>
                   ))}
