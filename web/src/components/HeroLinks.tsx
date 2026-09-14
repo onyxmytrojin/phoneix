@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef } from "react";
+import { useLayoutEffect, useRef } from "react";
 import { gsap } from "gsap";
 import { ScrambleTextPlugin } from "gsap/ScrambleTextPlugin";
 import { LinkedInIcon, PngIcon } from "@/components/Icons";
@@ -16,6 +16,21 @@ const LINKS = [
 
 export default function HeroLinks() {
   const textRefs = useRef<(HTMLSpanElement | null)[]>([]);
+  const btnRefs = useRef<(HTMLAnchorElement | null)[]>([]);
+
+  // Lock each button to its natural (real-label) width once, before paint —
+  // the scramble effect swaps in random characters whose glyphs can render
+  // narrower OR wider than the real label, which was nudging each button's
+  // own width and, in a wrapping flex row, bumping the last button down for
+  // a frame while it scrambled. An exact width (not min-width, which only
+  // stops shrinking) means the button's box can never move in either
+  // direction regardless of what the scramble animation renders inside it.
+  useLayoutEffect(() => {
+    btnRefs.current.forEach((el) => {
+      if (!el) return;
+      el.style.width = `${el.getBoundingClientRect().width}px`;
+    });
+  }, []);
 
   const handleEnter = (i: number, label: string) => {
     const el = textRefs.current[i];
@@ -48,6 +63,7 @@ export default function HeroLinks() {
       {LINKS.map((l, i) => (
         <a
           key={l.label}
+          ref={(el) => { btnRefs.current[i] = el; }}
           href={l.href}
           target="_blank"
           rel="noreferrer"
