@@ -22,7 +22,7 @@ const WORK: Entry[] = [
     role: "Software Engineer I",
     period: "Jun 2025 – Ongoing",
     location: "Bengaluru, India",
-    award: "🏆 Q3 Growth Mindset Award & Q4 Think Big Award",
+    award: "🏆 Q3 2025 Growth Mindset Award & Q4 2025 Think Big Award",
     bullets: [
       "Architected and shipped an in-house, event-driven payment-retry engine on AWS Lambda, SQS FIFO, EventBridge, and DynamoDB — replacing a third-party dunning system with a custom policy graph supporting pause/resume, partial funds, and self-healing payment-method blacklisting — and hardened it against concurrent-event races with provider-event-ID dedup keys plus DynamoDB conditional writes and consistent reads, so settlement and retry events can never resurrect a resolved invoice.",
       "Designed an automated customer payment-recovery lifecycle: collection pauses when no usable payment method exists, the customer is guided to update it, and retries resume automatically once they do — or wind down through the normal policy path if they never do.",
