@@ -418,7 +418,15 @@ a:hover { text-decoration: underline; text-underline-offset: 3px; }
    MORPH_FRACTION there. */
 .landing-left--settled .hero-intro { text-align: center; }
 .landing-left--expanded .hero-avatar-row { justify-content: center; }
-.landing-left--expanded .hero-links { justify-content: center; }
+/* NOT ".hero-links" — that div (page.tsx) only carries flex-item props
+   (order, below) for its own position within .landing-left's column; the
+   actual flex row that needs centering is HeroLinks.tsx's own inner div,
+   which needed its own class (.hero-links-row) to be targetable — the old
+   rule here targeted ".hero-links" itself, which was never a flex
+   container, so it silently did nothing and the buttons stayed left-
+   aligned (hugging the left edge of the full-width outer div) even once
+   expanded. */
+.landing-left--expanded .hero-links-row { justify-content: center; }
 
 /* Flex order of the hero's pieces — Flip animates the reflow smoothly when
    these values change between the compact and expanded states, rather than
