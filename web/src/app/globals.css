@@ -483,12 +483,16 @@ a:hover { text-decoration: underline; text-underline-offset: 3px; }
 
 /* ── Scroll-down cue ── only shown once the hero has settled into its
    expanded/centered state, where the remaining scroll-hold beat can read
-   as "is that it?" without a hint that Skills/Experience/Projects follow. */
+   as "is that it?" without a hint that Skills/Experience/Projects follow.
+   A normal flex item (order: 6, after .hero-currently-building's order: 5)
+   rather than position: absolute — it used to sit a fixed distance from
+   the container's bottom edge regardless of how tall the card above it
+   actually rendered, so a wrapped tag row (narrower viewports) pushed the
+   card down into it. Flowing in-flow means it always lands right after
+   the card, whatever height that card ends up being. */
 .hero-scroll-cue {
-  position: absolute;
-  left: 50%;
-  bottom: 28px;
-  transform: translateX(-50%);
+  order: 6;
+  margin-top: 18px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -500,6 +504,7 @@ a:hover { text-decoration: underline; text-underline-offset: 3px; }
   text-transform: uppercase;
   opacity: 0;
   pointer-events: none;
+  transition: opacity 0.3s ease;
 }
 .landing-left--expanded .hero-scroll-cue {
   opacity: 1;
