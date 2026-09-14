@@ -827,17 +827,20 @@ a:hover { text-decoration: underline; text-underline-offset: 3px; }
 }
 /* ── Mobile projects list (ProjectsBoard.tsx's MobileProjectList) ── a
    plain upright vertical stack, hidden by default; swaps in for the
-   draggable corkboard at the same 640px breakpoint the rest of the site
-   uses for its own mobile layout, where the corkboard's fixed 3-column
-   layout has no room to work and free-dragging isn't a great touch
-   interaction anyway. */
+   draggable corkboard at 900px (not just the site's usual 640px mobile
+   breakpoint) — the corkboard's 3 columns of min(270px, 82vw)-wide notes
+   need roughly 810px+ just for the notes themselves before any jitter or
+   gaps, so at tablet widths (~640-900px) the outer columns were clipping
+   past the board's edges. Free-dragging isn't a great touch interaction
+   at those widths either, so the plain list is the better swap-in the
+   whole way down from 900px, not just below 640px. */
 .projects-mobile-list { display: none; }
 .projects-mobile-card {
   border-radius: 6px;
   padding: 16px 18px;
   box-shadow: 4px 8px 16px rgba(0,0,0,0.25);
 }
-@media (max-width: 640px) {
+@media (max-width: 900px) {
   .sticky-board { display: none; }
   .projects-mobile-list {
     display: flex;

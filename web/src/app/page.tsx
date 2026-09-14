@@ -203,6 +203,17 @@ export default function Landing() {
           <GitHubActivity />
         </div>
       </section>
+
+      <footer style={{
+        position: "relative", zIndex: 1,
+        display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "center",
+        gap: "8px 20px", padding: "28px 24px 40px",
+        fontSize: "12px", color: "rgba(255,255,255,0.5)",
+      }}>
+        <span>&copy; {new Date().getFullYear()} Shubhan Mehrotra</span>
+        <a href="/privacy" style={{ color: "rgba(255,255,255,0.5)" }}>Privacy Policy</a>
+        <a href="/terms" style={{ color: "rgba(255,255,255,0.5)" }}>Terms &amp; Conditions</a>
+      </footer>
     </>
   );
 }
