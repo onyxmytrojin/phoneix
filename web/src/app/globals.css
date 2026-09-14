@@ -444,8 +444,17 @@ a:hover { text-decoration: underline; text-underline-offset: 3px; }
      overlay/scrim fade in ScrollTransition.tsx back to the #skills-
      triggered version. background-color specifically (not the
      `background` shorthand) so it tweens via Flip's `props` list rather
-     than switching instantly. */
-  background-color: transparent;
+     than switching instantly.
+     rgba(211,138,33,0) — same orange as the compact state's #d38a21, at
+     zero alpha — NOT the `transparent` keyword. `transparent` resolves to
+     rgba(0,0,0,0): interpolating from opaque orange to THAT tweens the RGB
+     channels toward black as well as alpha toward 0, so mid-transition it
+     passed through a dark, muddy, partially-see-through rectangle (visible
+     as a hard-edged dark overlay bound to this box's own edges — reported
+     via a recording of the live transition). Matching the RGB channels
+     here means only alpha animates, so it fades straight through
+     increasingly-transparent orange with no dark midpoint. */
+  background-color: rgba(211,138,33,0);
   /* Balances the leftover vertical space in the pinned 100vh box evenly
      above/below the content instead of packing everything to the top and
      dumping it all as one big gap underneath "Currently Building". */
