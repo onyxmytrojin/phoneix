@@ -118,6 +118,7 @@ export default function ClusterPage() {
   const [selKey,    setSelKey]    = useState<string|null>(null);
   const [keyVal,    setKeyVal]    = useState<string|null>(null);
   const [rebal,     setRebal]     = useState(false);
+  const [initialLoading, setInitialLoading] = useState(true);
 
   const prevStates = useRef<Record<string,string>>({});
   const prevKeys   = useRef<Set<string>>(new Set());
@@ -166,6 +167,7 @@ export default function ClusterPage() {
 
     async function tick() {
       await Promise.all([fetchCluster(signal), fetchKeys(signal)]);
+      setInitialLoading(false);
     }
 
     push("cluster","","connecting…");
@@ -217,6 +219,23 @@ export default function ClusterPage() {
       <span style={{fontSize: sm?"10px":"12px",color: sm?C.muted:C.text,fontVariantNumeric:"tabular-nums"}}>{v}</span>
     </div>
   );
+
+  if (initialLoading) {
+    return (
+      <div style={{
+        minHeight: "100vh", background: C.bg, color: C.muted,
+        display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+        gap: "12px", fontSize: "13px",
+      }}>
+        <div style={{
+          width: "28px", height: "28px", borderRadius: "50%",
+          border: `2px solid ${C.border}`, borderTopColor: C.accent,
+          animation: "spin 0.8s linear infinite",
+        }} />
+        Connecting to the cluster…
+      </div>
+    );
+  }
 
   return (
     <div style={{minHeight:"100vh",background:C.bg,color:C.text,fontSize:"13px"}}>

@@ -85,6 +85,11 @@ export default function ServerPage() {
   const [visitors,  setVisitors] = useState<VisitorData | null>(null);
   const [uptimeDays, setUptimeDays] = useState(90);
   const [selDay,    setSelDay]   = useState<AvailDay | null>(null);
+  // Gates the whole dashboard on the FIRST successful fetch only (not
+  // every 5s poll after) — without this, every metric's `?? 0` fallback
+  // rendered as a real (if misleading) "0%" / "0 GB" the instant the page
+  // mounted, before the phone had actually answered even once.
+  const [initialLoading, setInitialLoading] = useState(true);
 
   useEffect(() => {
     const ac = new AbortController();
@@ -101,6 +106,7 @@ export default function ServerPage() {
         const ext = all.filter(r => r.path && !DASH_PATHS.has(r.path));
         setLogs((ext.length > 0 ? [...ext].reverse() : [...all].reverse()).slice(0, 25));
       }
+      setInitialLoading(false);
     }
     async function slow() {
       const [a, r, c, v] = await Promise.all([
@@ -150,6 +156,23 @@ export default function ServerPage() {
       <div style={{ height: "100%", width: `${Math.min(100, pct)}%`, background: color, borderRadius: "2px", transition: "width 0.5s" }} />
     </div>
   );
+
+  if (initialLoading) {
+    return (
+      <div style={{
+        minHeight: "100vh", background: BG, color: MUTED,
+        display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+        gap: "12px", fontSize: "13px",
+      }}>
+        <div style={{
+          width: "28px", height: "28px", borderRadius: "50%",
+          border: `2px solid ${BORDER}`, borderTopColor: ACCENT,
+          animation: "spin 0.8s linear infinite",
+        }} />
+        Connecting to the phone…
+      </div>
+    );
+  }
 
   return (
     <div style={{ minHeight: "100vh", background: BG, color: TEXT }}>

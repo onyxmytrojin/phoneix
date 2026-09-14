@@ -6,10 +6,31 @@ import TimeAgo from "./TimeAgo";
 
 export default function GitHubActivity() {
   const [gh, setGh] = useState<GithubData | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchGithub().then(setGh);
+    fetchGithub().then(setGh).finally(() => setLoading(false));
   }, []);
+
+  // Distinct from the "no data" case below: while the fetch is still in
+  // flight, a skeleton holds the section's place instead of it just being
+  // absent — without this the whole block silently popped into existence
+  // (or never did, on a slow connection) with no indication anything was
+  // loading.
+  if (loading) {
+    return (
+      <section className="content-panel" style={{ marginTop: "24px" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px" }}>
+          <h2 style={{ fontSize: "16px", fontWeight: 700, color: "#fff" }}>GitHub Activity</h2>
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: "8px" }}>
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="commit-card-skeleton" />
+          ))}
+        </div>
+      </section>
+    );
+  }
 
   if (!gh) return null;
   if (!gh.recent_commits?.length) return null;

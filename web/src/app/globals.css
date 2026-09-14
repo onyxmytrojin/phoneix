@@ -198,6 +198,27 @@ a:hover { text-decoration: underline; text-underline-offset: 3px; }
   text-decoration: none;
 }
 
+/* ── GitHub Activity loading skeleton ── same footprint as .commit-card
+   (border-top, padding-derived height) so the section doesn't visibly
+   resize once the real cards swap in. */
+.commit-card-skeleton {
+  height: 76px;
+  border-radius: 8px;
+  border-top: 2px solid rgba(255,255,255,0.15);
+  background: linear-gradient(90deg, #5a3811 25%, #6b4419 37%, #5a3811 63%);
+  background-size: 400% 100%;
+  animation: skeletonShimmer 1.6s ease-in-out infinite;
+}
+@keyframes skeletonShimmer {
+  0%   { background-position: 100% 0; }
+  100% { background-position: 0 0; }
+}
+
+/* ── Shared loading spinner (Server/Cluster dashboards) ── */
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
 /* ── Log row: hide time columns on small screens ── */
 @media (max-width: 560px) {
   .log-row { grid-template-columns: 60px 1fr 52px !important; }
