@@ -567,17 +567,20 @@ a:hover { text-decoration: underline; text-underline-offset: 3px; }
 }
 
 /* ── Scroll-down cue ── visible from page load (both phone and desktop),
-   as a hint that there's more below before the user has scrolled at all —
-   not gated behind any scroll-triggered state (see the filter in
-   ScrollTransition.tsx that keeps this element out of Flip's tracked
-   opacity, which used to hold it at 0 until the hero morph was nearly
-   done). A normal flex item (order: 6, after .hero-currently-building's
-   order: 5) rather than position: absolute — it used to sit a fixed
-   distance from the container's bottom edge regardless of how tall the
-   card above it actually rendered, so a wrapped tag row (narrower
-   viewports) pushed the card down into it. Flowing in-flow means it
-   always lands right after the card, whatever height that card ends up
-   being. */
+   as a hint that there's more below before the user has scrolled at all.
+   Stays a normal Flip-tracked child (heroChildren in ScrollTransition.tsx
+   includes it) so it keeps riding along with its siblings' simulated
+   compact→expanded position during the morph — excluding it from Flip
+   tracking was tried first and caused a worse bug: it then rendered at
+   its real (expanded-flow) position while .hero-currently-building next
+   to it was still being visually held at its transformed (compact-look)
+   position, so the two overlapped at page load. Instead, only opacity is
+   forced here, via !important — GSAP sets opacity through a plain
+   (non-important) inline style, which a stylesheet !important rule always
+   beats regardless of the tween's progress, so this alone unpins the
+   opacity from Flip's captured pre-scroll value (0, which otherwise held
+   it invisible until the hero morph was nearly done) while leaving
+   Flip's positional transform on this element untouched. */
 .hero-scroll-cue {
   order: 6;
   margin-top: 18px;
@@ -590,6 +593,7 @@ a:hover { text-decoration: underline; text-underline-offset: 3px; }
   font-weight: 500;
   letter-spacing: 0.08em;
   text-transform: uppercase;
+  opacity: 1 !important;
   pointer-events: none;
 }
 .hero-scroll-cue svg {
