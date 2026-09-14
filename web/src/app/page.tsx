@@ -41,7 +41,7 @@ export default function Landing() {
           fades the overlay and scrim out at the end of the hero's scroll-
           hold instead, which is what actually reveals the waves once
           you're past the hero. */}
-      <WaveBackground className="fixed inset-0 -z-10" />
+      <WaveBackground className="wave-bg-fixed" />
       {/* Small, slowly spinning multi-strand coils scattered across the top
           half only, well clear of the hero's own content — sits just above
           the yellow waves and still well behind all content (z-index -6,

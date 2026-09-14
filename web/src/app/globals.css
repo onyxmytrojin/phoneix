@@ -7,6 +7,23 @@
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+html, body {
+  /* iOS Safari's elastic rubber-band bounce needs only a sub-pixel of real
+     horizontal scroll surface to trigger — something this page likely has
+     somewhere (multiple deliberately-oversized decorative layers:
+     WaveBackground's w-[200%] wave loops, BackgroundVideo's inset
+     overscan, etc. — each already clipped by its own overflow:hidden
+     wrapper, but easy for one to round a fraction of a pixel wide at an
+     odd viewport width). Once it triggers, a horizontal swipe bounces the
+     whole page a few px sideways and reveals html's raw background — this
+     site's near-black #060609 — behind it, which reads as a big empty gap
+     down one side (reported on a real iPhone; Chromium/Playwright don't
+     do this elastic bounce, which is why it never reproduced there).
+     Blocking horizontal overflow outright here removes the scroll
+     surface the bounce needs, rather than chasing whichever single layer
+     happens to round wide. */
+  overflow-x: hidden;
+}
 html {
   background: #060609;
   color: #e8eaf0;
@@ -581,6 +598,21 @@ a:hover { text-decoration: underline; text-underline-offset: 3px; }
 @keyframes scrollCueBounce {
   0%, 100% { transform: translateY(0); }
   50%      { transform: translateY(5px); }
+}
+
+/* ── Wave background backdrop (Skills/Experience/Projects) ── same slight
+   overscan as .transition-bg-overlay/.bg-video-scrim below, for the same
+   reason: plain inset:0 leaves a hairline seam at the viewport edge under
+   fractional devicePixelRatio/dynamic-viewport rounding, which — unlike
+   those two, which sit behind other opaque layers — would expose html's
+   own raw dark background directly, since this is the actual backdrop
+   for the whole post-hero page (nothing else is layered behind it). This
+   was the one full-bleed fixed layer that never got the overscan
+   treatment the other two already have. */
+.wave-bg-fixed {
+  position: fixed;
+  inset: -2vh -2vw;
+  z-index: -10;
 }
 
 /* ── Scroll-transition overlay (crossfades hero into the post-hero color) ── */
