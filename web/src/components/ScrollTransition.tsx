@@ -64,7 +64,18 @@ export default function ScrollTransition() {
     if (!heroPin || !heroLeft || !video || !videoInner || !overlay || !scrim) return;
 
     const ctx = gsap.context(() => {
-      const heroChildren = Array.from(heroLeft.children) as HTMLElement[];
+      // .hero-scroll-cue is deliberately excluded: it's meant to invite the
+      // very first scroll, so it needs to just be visible from page load
+      // rather than fading in as a byproduct of Flip's captured before/after
+      // opacity for this element (which pinned it at its pre-scroll value —
+      // 0 — until the scrub timeline had almost finished, i.e. after the
+      // user had already scrolled most of the way through the hero). Since
+      // its own order/size never differs between compact and expanded, it
+      // still rides along correctly with heroLeft's own tracked transform —
+      // this only opts it out of Flip's per-child opacity tween.
+      const heroChildren = Array.from(heroLeft.children).filter(
+        (el) => !el.classList.contains("hero-scroll-cue")
+      ) as HTMLElement[];
       const avatar = heroLeft.querySelector<HTMLElement>(".hero-avatar");
       const avatarInfo = heroLeft.querySelector<HTMLElement>(".hero-avatar-info");
 

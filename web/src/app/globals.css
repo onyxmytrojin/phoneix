@@ -549,15 +549,18 @@ a:hover { text-decoration: underline; text-underline-offset: 3px; }
   height: 120px;
 }
 
-/* ── Scroll-down cue ── only shown once the hero has settled into its
-   expanded/centered state, where the remaining scroll-hold beat can read
-   as "is that it?" without a hint that Skills/Experience/Projects follow.
-   A normal flex item (order: 6, after .hero-currently-building's order: 5)
-   rather than position: absolute — it used to sit a fixed distance from
-   the container's bottom edge regardless of how tall the card above it
-   actually rendered, so a wrapped tag row (narrower viewports) pushed the
-   card down into it. Flowing in-flow means it always lands right after
-   the card, whatever height that card ends up being. */
+/* ── Scroll-down cue ── visible from page load (both phone and desktop),
+   as a hint that there's more below before the user has scrolled at all —
+   not gated behind any scroll-triggered state (see the filter in
+   ScrollTransition.tsx that keeps this element out of Flip's tracked
+   opacity, which used to hold it at 0 until the hero morph was nearly
+   done). A normal flex item (order: 6, after .hero-currently-building's
+   order: 5) rather than position: absolute — it used to sit a fixed
+   distance from the container's bottom edge regardless of how tall the
+   card above it actually rendered, so a wrapped tag row (narrower
+   viewports) pushed the card down into it. Flowing in-flow means it
+   always lands right after the card, whatever height that card ends up
+   being. */
 .hero-scroll-cue {
   order: 6;
   margin-top: 18px;
@@ -570,12 +573,7 @@ a:hover { text-decoration: underline; text-underline-offset: 3px; }
   font-weight: 500;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  opacity: 0;
   pointer-events: none;
-  transition: opacity 0.3s ease;
-}
-.landing-left--expanded .hero-scroll-cue {
-  opacity: 1;
 }
 .hero-scroll-cue svg {
   animation: scrollCueBounce 1.6s ease-in-out infinite;
@@ -864,19 +862,29 @@ a:hover { text-decoration: underline; text-underline-offset: 3px; }
 @media (max-width: 640px) {
   /* Used to hide entirely here — a leftover from when there were two nav
      bars (this one plus an icon rail); once this became the only nav,
-     hiding it left mobile with no way to navigate at all. Scaled down and
-     allowed to wrap to a second row instead, since six links at full
-     desktop size don't fit a phone-width screen in one row. */
+     hiding it left mobile with no way to navigate at all. Wrapping to
+     multiple rows (an earlier attempt) read badly as a stacked block
+     instead of a nav pill, so instead this stays a single row and
+     scrolls horizontally when six links at even a shrunk size still
+     don't fit a phone-width screen — a normal, swipeable mobile-nav
+     pattern rather than a tall multi-row stack. */
   .landing-nav {
     max-width: 92vw;
-    flex-wrap: wrap;
-    justify-content: center;
-    gap: 3px 5px;
-    padding: 6px 12px;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    gap: 2px;
+    padding: 8px 14px;
     top: 10px;
   }
+  .landing-nav::-webkit-scrollbar {
+    display: none;
+  }
   .landing-nav a {
-    font-size: 10.5px;
-    padding: 4px 7px;
+    font-size: 11px;
+    padding: 6px 8px;
+    white-space: nowrap;
+    flex-shrink: 0;
   }
 }
