@@ -11,12 +11,25 @@ export default function BackgroundVideo({ className = "bg-video" }: { className?
   const durationRef = useRef<number>(0);
   const rafRef = useRef<number | null>(null);
 
+  // 0.1s (was 0.01s) — each seek is a real decode-side cost even on the
+  // densely-keyframed re-encode (see globals.css .bg-video comment for the
+  // GPUTask profiling that found this). At 0.01s, essentially any
+  // perceptible mouse movement exceeded the threshold, so a fresh seek
+  // fired on nearly every rAF tick during natural cursor movement — the
+  // dominant remaining source of scroll-transition jank after the
+  // will-change and video re-encode fixes. 0.1s cuts seek frequency
+  // substantially (measured: eliminates frames over 50ms in a scripted
+  // scroll+mouse-movement test) while staying fine-grained enough that the
+  // scrub still feels responsive — a 0.1s step is ~13px of cursor movement
+  // across a typical hero width, well under what reads as "steppy".
+  const SEEK_THRESHOLD = 0.1;
+
   const requestSeek = () => {
     const video = videoRef.current;
     if (!video || isSeekingRef.current) return;
 
     const diff = Math.abs(video.currentTime - targetTimeRef.current);
-    if (diff > 0.01) {
+    if (diff > SEEK_THRESHOLD) {
       isSeekingRef.current = true;
       video.currentTime = targetTimeRef.current;
     }
@@ -28,7 +41,7 @@ export default function BackgroundVideo({ className = "bg-video" }: { className?
     if (!video) return;
 
     const diff = Math.abs(video.currentTime - targetTimeRef.current);
-    if (diff > 0.01) {
+    if (diff > SEEK_THRESHOLD) {
       isSeekingRef.current = true;
       video.currentTime = targetTimeRef.current;
     }
