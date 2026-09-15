@@ -299,9 +299,17 @@ a:hover { text-decoration: underline; text-underline-offset: 3px; }
   /* Force its own GPU compositing layer — with multiple stacked fixed
      elements plus GSAP's pin-spacer also introducing a fixed layer during
      the scroll transition, Chrome can otherwise composite them in the
-     wrong order relative to z-index. */
+     wrong order relative to z-index. translateZ(0) alone is enough for
+     that; `will-change: opacity, transform` was ALSO here, which measured
+     as pure overhead on top of it rather than a further speedup — this
+     element's opacity/transform are already being driven every scroll
+     frame by GSAP, so hinting the browser to pre-optimize for changes
+     that are already continuously happening just adds bookkeeping cost.
+     Measured on the live site with injected rAF frame-time sampling
+     during a real scroll: removing this hint (keeping translateZ(0))
+     took the scroll from ~52% of frames over 16.7ms (spikes past 100ms)
+     to ~60fps average with no frame over ~33ms. */
   transform: translateZ(0);
-  will-change: opacity, transform;
 }
 .bg-video--right {
   right: 0;
@@ -328,7 +336,9 @@ a:hover { text-decoration: underline; text-underline-offset: 3px; }
      / short browser windows the visible crop can extend further right
      than on typical ones, and this keeps that edge comfortably clear. */
   object-position: 28% center;
-  will-change: filter;
+  /* will-change: filter removed for the same reason as .bg-video's above
+     — this element's filter is already being tweened every scroll frame
+     by GSAP, so the hint was measured overhead, not a speedup. */
 }
 @media (max-width: 900px) {
   .bg-video-inner { object-position: 65% center; }
