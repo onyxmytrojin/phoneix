@@ -10,8 +10,21 @@ const DASH_PATHS = new Set(["/v1/server","/v1/logs","/v1/cluster","/v1/cluster/k
 type LogEntry = { method?: string; path?: string; status?: number; duration_ms?: number; timestamp?: string };
 type NodeData  = { node_id?: string; id?: string; status?: string; port?: number; keys_held?: number; uptime_seconds?: number; requests_total?: number; peer_states?: Record<string,string> };
 type SrvData   = { uptime_human?: string; cpu_percent?: number; memory?: { used_gb: number; total_gb: number; percent_used: number }; disk?: { free_gb: number; total_gb: number }; load_avg?: number[] };
-type AvailDay  = { date: string; status: string; uptime_percent: number; requests?: number; errors?: number };
-type AvailData = { days?: AvailDay[]; summary?: { last_30_days?: number; last_90_days?: number } };
+type Outage    = { start: string; end: string; duration_s: number; ongoing?: boolean };
+type ErrEndpoint = { path: string; count: number; status: number };
+type AvailDay  = {
+  date: string; status: string; uptime_percent: number; requests?: number; errors?: number;
+  downtime_s?: number; outages?: Outage[]; error_endpoints?: ErrEndpoint[];
+};
+type AvailData = { days?: AvailDay[]; summary?: { last_30_days?: number; last_90_days?: number; tracking_since?: string | null } };
+
+const fmtDur = (s: number) => {
+  if (s < 60) return `${s}s`;
+  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60);
+  return h ? `${h}h ${m}m` : `${m}m`;
+};
+const fmtClock = (iso: string) =>
+  new Date(iso).toLocaleTimeString([], { hour: "numeric", minute: "2-digit", timeZoneName: "short" });
 type RespData     = { endpoints?: Record<string, { p50?: number; count?: number }> };
 type ClusterData  = { nodes?: NodeData[]; summary?: { alive?: number; total?: number; total_keys?: number } };
 type VisitorData  = { today?: number; this_week?: number; all_time?: number };
@@ -367,18 +380,63 @@ export default function ServerPage() {
                           <div style={{ fontSize: "18px", fontWeight: 700, color: (selDay.errors ?? 0) > 0 ? RED : TEXT, lineHeight: 1 }}>{(selDay.errors ?? 0).toLocaleString()}</div>
                           <div style={{ fontSize: "10px", color: MUTED, letterSpacing: "0.06em", textTransform: "uppercase" }}>errors</div>
                         </div>
-                        {(selDay.requests ?? 0) > 0 && (
-                          <div style={{ fontSize: "11px", color: MUTED }}>
-                            {selDay.status !== "healthy" && (selDay.errors ?? 0) === 0
-                              ? `Server unreachable for ~${(100 - selDay.uptime_percent).toFixed(1)}% of the day`
-                              : (selDay.errors ?? 0) === 0
-                              ? "All requests succeeded"
-                              : `${selDay.errors} requests failed (5xx)`}
-                          </div>
-                        )}
+                        {(() => {
+                          const outages = selDay.outages ?? [];
+                          const errs = selDay.error_endpoints ?? [];
+                          const sectionLabel = { fontSize: "10px", color: MUTED, letterSpacing: "0.06em", textTransform: "uppercase" as const, marginBottom: "6px" };
+                          const row = { display: "flex", justifyContent: "space-between", gap: "12px", fontSize: "12px", padding: "3px 0", borderTop: `1px solid ${BORDER_SOFT}` };
+                          const clean = outages.length === 0 && errs.length === 0;
+                          return (
+                            <div style={{ flexBasis: "100%", display: "flex", flexDirection: "column", gap: "12px", paddingTop: "10px", borderTop: `1px solid ${BORDER_SOFT}` }}>
+                              {outages.length > 0 && (
+                                <div>
+                                  <div style={sectionLabel}>
+                                    Downtime · {fmtDur(selDay.downtime_s ?? 0)} across {outages.length} outage{outages.length > 1 ? "s" : ""}
+                                  </div>
+                                  {outages.map((o, i) => (
+                                    <div key={i} style={row}>
+                                      <span style={{ fontFamily: "var(--font-geist-mono), monospace", color: TEXT }}>
+                                        {fmtClock(o.start)} → {o.ongoing ? "now" : fmtClock(o.end)}
+                                      </span>
+                                      <span style={{ color: statusColor(selDay), fontWeight: 600 }}>
+                                        {fmtDur(o.duration_s)}{o.ongoing ? " · ongoing" : ""}
+                                      </span>
+                                    </div>
+                                  ))}
+                                  <div style={{ fontSize: "11px", color: MUTED, marginTop: "6px" }}>
+                                    No heartbeat was received from the API during these windows, so the server process or the phone was offline.
+                                  </div>
+                                </div>
+                              )}
+                              {errs.length > 0 && (
+                                <div>
+                                  <div style={sectionLabel}>Failed requests · {(selDay.errors ?? 0).toLocaleString()} returned 5xx</div>
+                                  {errs.map(e => (
+                                    <div key={e.path} style={row}>
+                                      <span style={{ fontFamily: "var(--font-geist-mono), monospace", color: TEXT }}>{e.path}</span>
+                                      <span style={{ color: RED, fontWeight: 600 }}>{e.count}× · HTTP {e.status}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                              {clean && (
+                                <div style={{ fontSize: "11px", color: selDay.status === "healthy" ? MUTED : ORANGE }}>
+                                  {selDay.status === "healthy"
+                                    ? "No downtime and no failed requests."
+                                    : "Uptime dipped below the healthy threshold but no outage window was recorded."}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })()}
                       </>}
                       {selDay.status === "no_data" && (
-                        <div style={{ fontSize: "11px", color: MUTED }}>No uptime data was recorded for this day.</div>
+                        <div style={{ fontSize: "11px", color: MUTED, flexBasis: "100%" }}>
+                          {avail?.summary?.tracking_since && selDay.date < avail.summary.tracking_since.slice(0, 10)
+                            ? `Uptime tracking began on ${new Date(avail.summary.tracking_since).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}; nothing was recorded before then.`
+                            : "No uptime data was recorded for this day."}
+                          {(selDay.requests ?? 0) > 0 && ` ${selDay.requests!.toLocaleString()} requests were served that day (traffic only — it says nothing about downtime).`}
+                        </div>
                       )}
                     </div>
                   )}
