@@ -63,7 +63,17 @@ export default function ScrollTransition() {
     const scrim = document.querySelector<HTMLElement>(".bg-video-scrim");
     if (!heroPin || !heroLeft || !video || !videoInner || !overlay || !scrim) return;
 
-    const ctx = gsap.context(() => {
+    // Everything below measures the page at build time and bakes the result
+    // in as pixel values: Flip captures the compact layout and animates to
+    // the expanded one with pixel translations, and each tween records its
+    // start values (e.g. the video's opacity) from whatever CSS applied at
+    // that moment. None of that is recomputed when the window changes size,
+    // so Ctrl +/- (which changes the page's CSS width) left the hero text
+    // shifted off-screen and the video at the wrong opacity. So the whole
+    // setup is wrapped in build() and redone on resize (see below).
+    let ctx: gsap.Context | undefined;
+    let masterTl: gsap.core.Timeline | undefined;
+    const build = () => { ctx = gsap.context(() => {
       const heroChildren = Array.from(heroLeft.children) as HTMLElement[];
       const avatar = heroLeft.querySelector<HTMLElement>(".hero-avatar");
       const avatarInfo = heroLeft.querySelector<HTMLElement>(".hero-avatar-info");
@@ -162,6 +172,7 @@ export default function ScrollTransition() {
       // ScrollTrigger scrubs the *entire* hero morph (position, size,
       // reflow, color) continuously with scroll — properly reversible on
       // scroll-up too, rather than a discrete snap at either end.
+      masterTl = master;
       master.add(flipTl, 0);
       // overlay is opaque by default (globals.css) and sits behind the
       // video in the DOM, so fading the video out alone already reveals
@@ -200,9 +211,9 @@ export default function ScrollTransition() {
       // successfully. Forcing one explicit refresh here is what actually
       // makes it measure the page and start responding to scroll.
       ScrollTrigger.refresh();
-    });
+    }); };
 
-    return () => {
+    const teardown = () => {
       // classList changes aren't GSAP-tracked, so ctx.revert() alone won't
       // undo them — without this, React 18 Strict Mode's dev-only double
       // mount leaves the classes stuck "on" from the first effect run, so
@@ -210,7 +221,59 @@ export default function ScrollTransition() {
       // layout and has nothing left to animate.
       heroLeft.classList.remove("landing-left--expanded");
       heroLeft.classList.remove("landing-left--settled");
-      ctx.revert();
+      // Rewind to the start state before reverting: reverting a timeline
+      // that is mid-way or finished (i.e. any resize while scrolled down
+      // the page) left the hero's Flip transform stale, so the hero came
+      // back offset by hundreds of px once scrolled to the top. Reverting
+      // from progress 0 restores cleanly, same as a resize at the top.
+      masterTl?.progress(0);
+      masterTl = undefined;
+      ctx?.revert();
+      ctx = undefined;
+      // revert() leaves the inline opacity/filter it last rendered on these
+      // (none of them has an inline style of its own in the markup). An
+      // inline value beats the stylesheet, so if the layout mode changed
+      // across a resize — e.g. zooming in past the compact-hero breakpoint,
+      // where CSS says the video is opacity: 0.3 — the rebuilt tween would
+      // read the stale inline 1 as its start value and the video would stay
+      // fully bright behind the text.
+      [video, overlay, scrim].forEach((el) => el.style.removeProperty("opacity"));
+      videoInner.style.removeProperty("filter");
+    };
+
+    build();
+
+    // Rebuild once the window size settles. Browser zoom fires this too (it
+    // changes innerWidth). Height-only changes under 25% are ignored: on
+    // phones the URL bar sliding in and out fires resize on every scroll,
+    // and rebuilding a pinned scroll animation mid-scroll would be worse
+    // than the tiny mismatch it fixes. The scroll position is restored
+    // because tearing the pin down shrinks the page and the browser clamps
+    // scrollY.
+    let lastW = window.innerWidth;
+    let lastH = window.innerHeight;
+    let timer: number | undefined;
+    const onResize = () => {
+      window.clearTimeout(timer);
+      timer = window.setTimeout(() => {
+        const w = window.innerWidth;
+        const h = window.innerHeight;
+        if (w === lastW && Math.abs(h - lastH) < lastH * 0.25) return;
+        lastW = w;
+        lastH = h;
+        const y = window.scrollY;
+        teardown();
+        build();
+        window.scrollTo(0, y);
+        ScrollTrigger.update();
+      }, 120);
+    };
+    window.addEventListener("resize", onResize);
+
+    return () => {
+      window.clearTimeout(timer);
+      window.removeEventListener("resize", onResize);
+      teardown();
     };
   }, []);
 
