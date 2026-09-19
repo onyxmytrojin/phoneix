@@ -14,6 +14,7 @@ from app.middleware.logging import RequestLoggingMiddleware
 from app.routers import health, server, github, profile, metrics, discovery
 from app.routers.github import warm_cache
 from app.routers.metrics import _rotate_logs
+from app.heartbeat import heartbeat_loop, rotate_heartbeats
 from app.routers.webhook import router as webhook_router
 
 limiter = Limiter(key_func=get_remote_address, default_limits=[f"{RATE_LIMIT}/minute"])
@@ -50,6 +51,7 @@ async def _rotation_loop():
     await asyncio.sleep(300)  # let startup settle before first run
     while True:
         _rotate_logs()
+        rotate_heartbeats()
         await asyncio.sleep(24 * 3600)
 
 
@@ -58,6 +60,7 @@ async def startup():
     await init_db()
     asyncio.create_task(warm_cache())
     asyncio.create_task(_rotation_loop())
+    asyncio.create_task(heartbeat_loop())
 
 
 @app.on_event("shutdown")

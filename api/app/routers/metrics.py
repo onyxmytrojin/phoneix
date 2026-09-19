@@ -9,6 +9,8 @@ from datetime import datetime, timezone, timedelta
 
 from fastapi import APIRouter, Response, HTTPException, Request
 from app.middleware.logging import LOG_PATH
+from app.availability import compute_availability
+from app.heartbeat import read_heartbeats
 
 # Cache node addresses — override via CACHE_NODES env var as comma-separated
 # host:tcp-port pairs: "localhost:6001,localhost:6002,localhost:6003"
@@ -188,7 +190,9 @@ async def availability(response: Response):
         return _avail_cache[1]
     logs = _read_logs(24 * 90)
 
-    # bucket logs by day — keep full entries for gap detection
+    # Request logs only supply per-day request/5xx counts. Downtime itself
+    # comes from heartbeat gaps (see availability.py) — gaps between requests
+    # just meant nobody was visiting.
     by_day: dict[str, list[dict]] = defaultdict(list)
     for e in logs:
         try:
@@ -196,46 +200,7 @@ async def availability(response: Response):
         except Exception:
             continue
 
-    today = datetime.now(timezone.utc).date()
-    # Gossip fires every 2 s, so a gap of >5 min means the server was genuinely down.
-    GAP_S = 5 * 60
-    days = []
-    for i in range(89, -1, -1):
-        day = (today - timedelta(days=i)).isoformat()
-        entries = by_day.get(day, [])
-        if not entries:
-            days.append({"date": day, "uptime_percent": 100.0, "status": "no_data", "requests": 0, "errors": 0})
-            continue
-
-        errors_count = sum(1 for e in entries if e.get("status", 200) >= 500)
-
-        # Detect downtime from gaps between consecutive log entries.
-        ts_list = sorted(
-            datetime.fromisoformat(e["timestamp"])
-            for e in entries if e.get("timestamp")
-        )
-        downtime_s = sum(
-            (ts_list[j] - ts_list[j - 1]).total_seconds()
-            for j in range(1, len(ts_list))
-            if (ts_list[j] - ts_list[j - 1]).total_seconds() > GAP_S
-        )
-
-        gap_pct  = round(max(0.0, (86400.0 - downtime_s) / 86400.0 * 100), 1)
-        err_pct  = round((1 - errors_count / len(entries)) * 100, 1)
-        pct      = min(gap_pct, err_pct)
-        status   = "healthy" if pct >= 99.0 else "degraded" if pct >= 90.0 else "incident"
-        days.append({"date": day, "uptime_percent": pct, "status": status, "requests": len(entries), "errors": errors_count})
-
-    all_pcts = [d["uptime_percent"] for d in days if d["status"] != "no_data"]
-    avg = round(sum(all_pcts) / len(all_pcts), 2) if all_pcts else 100.0
-
-    result = {
-        "days": days,
-        "summary": {
-            "last_90_days": avg,
-            "today": days[-1]["uptime_percent"] if days else 100.0,
-        }
-    }
+    result = compute_availability(read_heartbeats(24 * 90), by_day, datetime.now(timezone.utc))
     _avail_cache = (time.monotonic(), result)
     return result
 

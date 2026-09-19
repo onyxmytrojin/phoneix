@@ -378,7 +378,7 @@ export default function ServerPage() {
                         )}
                       </>}
                       {selDay.status === "no_data" && (
-                        <div style={{ fontSize: "11px", color: MUTED }}>Server was not running or no requests recorded on this day.</div>
+                        <div style={{ fontSize: "11px", color: MUTED }}>No uptime data was recorded for this day.</div>
                       )}
                     </div>
                   )}
