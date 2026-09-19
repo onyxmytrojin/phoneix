@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from "react";
 
-const VIDEO_PATH = "/media/hero_vid_yellow_v2.mp4";
+const VIDEO_PATH = "/media/hero_vid_yellow_v3.mp4";
 
 export default function BackgroundVideo({ className = "bg-video" }: { className?: string }) {
   const videoRef = useRef<HTMLVideoElement | null>(null);

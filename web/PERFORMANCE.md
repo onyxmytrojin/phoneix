@@ -197,3 +197,18 @@ than a single remaining bug. Further improvement here would mean reducing
 how much the scroll-scrubbed animation actually does per frame (fewer
 simultaneously-tweened properties, or a simpler morph), which is a design
 tradeoff rather than a bug fix.
+
+## Update 2026-09-20 — hero video is now `hero_vid_yellow_v3.mp4` (1136×720)
+
+The video file was replaced again while fixing the character being cut off at
+the right edge of most desktop windows (see the comments on `.bg-video-inner`
+and the compact-hero media query in `globals.css`):
+
+- **Trimmed to 1136px wide** (from 1280) so the leftover watermark-patch smudge
+  on the right shoulder (x≈1137–1184) can never be shown. Encoded from the
+  original 8.4 MB source in git history (commit `27dd93a`), not from the v2
+  re-encode, so there is only one generation of compression loss. Same
+  settings as v2: no audio, keyframe every 6 frames, CRF 25 (~1.6 MB).
+- Renamed to `_v3` for the same Cloudflare-cache reason as `_v2` above.
+- The performance conclusions above are unchanged: the seek threshold is
+  still 0.1 in `BackgroundVideo.tsx`.

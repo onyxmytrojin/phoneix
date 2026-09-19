@@ -316,7 +316,16 @@ a:hover { text-decoration: underline; text-underline-offset: 3px; }
   left: 42%;
   width: 58%;
 }
-@media (max-width: 900px) {
+/* Compact hero: below ~1200px wide, or in a squarish/portrait window
+   (width/height <= 4:3), the desktop layout has no room for the character
+   beside the 560px text panel — it would slide underneath the text — so
+   the video goes full-width and dim behind the text instead (this is the
+   same layout phones/tablets already used at <=900px; the desktop
+   breakpoint just no longer ends at 900). Measured with a head-position
+   sweep across 14 window sizes: any wider/taller-than-this window keeps the
+   head clear of the text panel. Used by the four hero rules below
+   (video box, video crop, scrim, text panel) — keep them identical. */
+@media (max-width: 1200px), (max-aspect-ratio: 4/3) {
   .bg-video--right {
     left: 0;
     width: 100%;
@@ -335,13 +344,25 @@ a:hover { text-decoration: underline; text-underline-offset: 3px; }
      keeping some leftward shift here is cheap extra margin: on very wide
      / short browser windows the visible crop can extend further right
      than on typical ones, and this keeps that edge comfortably clear. */
-  object-position: 28% center;
+  /* Anchored to the RIGHT edge (100%), not a fixed 28%. With object-fit:
+     cover in a box narrower than the video, the crop is decided entirely by
+     this value: 28% kept the frame's left ~30% and dropped the right, which
+     cut the character's head/shoulder off at most desktop window shapes
+     (only ultra-wide windows, where nothing is cropped, showed all of it).
+     Pinned right, the character always sits flush against the window's
+     right edge and scales with window height; whatever gets cropped is the
+     empty background on the left, which the scrim/text panel cover anyway.
+     The source frame is 1136px wide (trimmed from 1280) so the old
+     watermark-patch smudge past x=1136 can never show. */
+  object-position: 100% center;
   /* will-change: filter removed for the same reason as .bg-video's above
      — this element's filter is already being tweened every scroll frame
      by GSAP, so the hint was measured overhead, not a speedup. */
 }
-@media (max-width: 900px) {
-  .bg-video-inner { object-position: 65% center; }
+@media (max-width: 1200px), (max-aspect-ratio: 4/3) {
+  /* 78% shows the same part of the (now 1136px-wide) frame that the old
+     65% showed of the 1280px one. */
+  .bg-video-inner { object-position: 78% center; }
 }
 
 /* Blends the video into the landing page using the video's own warm
@@ -354,7 +375,15 @@ a:hover { text-decoration: underline; text-underline-offset: 3px; }
   inset: -2vh -2vw;
   z-index: 0;
   pointer-events: none;
-  background: linear-gradient(90deg, #d38a21 0%, #d38a21 42%, rgba(211,138,33,0) 68%);
+  /* Solid up to 42% (where the video box begins, so its left edge is
+     hidden) then a SHORT fade. It used to fade out over 42%->68%, but the
+     character now sits further left on smaller windows (right-anchored, it
+     scales with height), so a 26%-wide fade washed out the left side of
+     the head. 8% (42%->50%) softens the video's lighter glow meeting the
+     flat page colour at the box edge, and still ends before the head's left
+     edge (>=56% of the width at any window shape that keeps the desktop
+     layout — the extreme, a ~1210x900 window, only grazes it). */
+  background: linear-gradient(90deg, #d38a21 0%, #d38a21 42%, rgba(211,138,33,0) 50%);
   /* DIAGNOSTIC: dropped this element's own translateZ(0) GPU-layer
      promotion. This is a static, never-animated gradient, so it doesn't
      need its own compositing layer — and with .bg-video and
@@ -366,7 +395,7 @@ a:hover { text-decoration: underline; text-underline-offset: 3px; }
      not something tied to any one element's own content). Removing the
      ones that don't strictly need their own layer to see if that's it. */
 }
-@media (max-width: 900px) {
+@media (max-width: 1200px), (max-aspect-ratio: 4/3) {
   .bg-video-scrim { display: none; }
 }
 
@@ -423,7 +452,7 @@ a:hover { text-decoration: underline; text-underline-offset: 3px; }
   display: flex;
   flex-direction: column;
 }
-@media (max-width: 900px) {
+@media (max-width: 1200px), (max-aspect-ratio: 4/3) {
   .landing-left {
     width: 100%;
     padding: 88px 20px 40px;
